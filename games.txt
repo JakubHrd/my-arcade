@@ -1,0 +1,1121 @@
+﻿
+===== src/games/rps/RPS.ui.tsx =====
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Card, CardContent, Stack, Typography, TextField, Button, Chip, Box, Divider, ToggleButton, ToggleButtonGroup, IconButton,
+} from '@mui/material';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
+import SportsMmaIcon from '@mui/icons-material/SportsMma';
+import RedeemIcon from '@mui/icons-material/Redeem';
+import CloseIcon from '@mui/icons-material/Close';
+import { useCasino } from '@games/core/useCasino';
+import { decide, icon, options, toChoice, randomChoice, RPSChoice, RPSResult } from './RPS.logic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FlyCoins } from '@shared/fx/FlyCoins';
+import { Confetti } from '@shared/fx/Confetti';
+
+export default function RPSGame() {
+  const { balance, priceTable, defaultPayout, startRound, finishRound, maybeDailyBonus } = useCasino();
+  const roundRef = useRef<string | null>(null);
+
+  const cost = priceTable.RPS?.entry ?? 5;
+  const [input, setInput] = useState<RPSChoice | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'countdown' | 'reveal' | 'finished'>('idle');
+  const [count, setCount] = useState(3);
+  const [cpu, setCpu] = useState<RPSChoice | null>(null);
+  const [result, setResult] = useState<RPSResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+
+  const [overlay, setOverlay] = useState<{ open: boolean; type: 'win' | 'loss' | 'draw'; payout: number }>({
+    open: false,
+    type: 'draw',
+    payout: 0,
+  });
+  const [coinsFx, setCoinsFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+
+  // klĂˇvesovĂ© zkratky
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'k') setInput('kamen');
+      if (k === 'n') setInput('nuzky');
+      if (k === 'p') setInput('papir');
+      if (k === 'enter') handlePlay();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, input, balance]);
+
+  const canPlay = Number.isFinite(cost) && balance >= (cost | 0);
+
+  function resetInternals(keepChoice = true) {
+    setPhase('idle');
+    if (!keepChoice) setInput(null);
+    setCpu(null);
+    setResult(null);
+    setCount(3);
+    setBusy(false);
+    roundRef.current = null;
+    setHint(null);
+  }
+
+  function smartPrepare() {
+    // pokud bylo dohrĂˇno pĹ™edchozĂ­ kolo, tady ho vnitĹ™nÄ› â€žuklidĂ­meâ€ś bez nutnosti kliknout na â€žNovĂˇ hraâ€ś
+    if (phase === 'finished') resetInternals(true);
+  }
+
+  function handlePlay() {
+    if (busy) return;
+
+    // â€žSmart Playâ€ś â€“ pokud jsem po dohranĂ©m kole, vnitĹ™nÄ› resetni a pokraÄŤuj
+    smartPrepare();
+
+    const choice = input;
+    if (!choice) { setHint('Vyber kĂˇmen / nĹŻĹľky / papĂ­r.'); return; }
+    if (!canPlay) { setHint('Nedostatek mincĂ­. Zkus DennĂ­ bonus.'); return; }
+
+    const st = startRound('RPS');
+    if (!st?.ok) { setHint('Nedostatek mincĂ­.'); return; }
+    roundRef.current = st.roundId;
+
+    setBusy(true); setHint(null); setPhase('countdown'); setCount(3);
+
+    let t = 3;
+    const id = setInterval(() => {
+      t -= 1;
+      if (t <= 0) {
+        clearInterval(id);
+
+        const c = randomChoice();
+        setCpu(c);
+
+        const res = decide(choice, c);
+        setResult(res);
+        setPhase('reveal');
+
+        const payout = defaultPayout('RPS', res);
+        finishRound('RPS', { roundId: roundRef.current!, result: res, payout, details: { user: choice, cpu: c } });
+
+        // overlay + efekty
+        setOverlay({ open: true, type: res, payout });
+
+        if (res === 'win' && payout > 0) {
+          setCoinsFx(true);
+          setConfettiFx(true);
+          // mince letĂ­ do banku + ping s ÄŤĂˇstkou
+          setTimeout(() => { setCoinsFx(false); setConfettiFx(false); }, 1100);
+        }
+
+        // po krĂˇtkĂ© chvĂ­li overlay zavĹ™eme a pĹ™epneme do finished (jede Smart Play)
+        setTimeout(() => {
+          setOverlay((o) => ({ ...o, open: false }));
+          setPhase('finished');
+          setBusy(false);
+        }, 1100);
+      } else {
+        setCount(t);
+      }
+    }, 500);
+  }
+
+  const banner = useMemo(() => {
+    if (!result) return null;
+    if (result === 'win') return { text: 'VyhrĂˇl jsi! đźŽ‰', color: 'success' as const };
+    if (result === 'loss') return { text: 'ProhrĂˇl jsi. đź…', color: 'error' as const };
+    return { text: 'RemĂ­za!', color: 'default' as const };
+  }, [result]);
+
+  return (
+    <Card variant="outlined" sx={{ overflow: 'hidden' }}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+              <Chip icon={<SportsMmaIcon />} label="KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r" />
+              <Chip variant="outlined" label={`Cena: ${cost}`} />
+              <Chip variant="outlined" label={`ZĹŻstatek: ${balance}`} />
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Zkratky: K / N / P, Enter = HrĂˇt</Typography>
+          </Stack>
+
+          <Divider />
+
+          <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
+            {/* Vstup */}
+            <Box flex={1}>
+              <Typography variant="subtitle2" gutterBottom>Tvoje volba</Typography>
+              <ToggleButtonGroup exclusive value={input} onChange={(_, v: RPSChoice | null) => setInput(v)} size="small">
+                {options.map((o) => (
+                  <ToggleButton key={o} value={o}>
+                    <motion.span initial={false} animate={{ scale: input === o ? 1.2 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 18 }} style={{ fontSize: 22, marginRight: 6 }}>
+                      {icon(o)}
+                    </motion.span>
+                    {o}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              <TextField
+                label="nebo napiĹˇ (kĂˇmen / nĹŻĹľky / papĂ­r)" size="small" fullWidth sx={{ mt: 1 }}
+                value={input ?? ''} onChange={(e) => setInput(toChoice(e.target.value))}
+              />
+            </Box>
+
+            {/* ArĂ©na */}
+            <Box flex={1}>
+              <Typography variant="subtitle2" gutterBottom>ArĂ©na</Typography>
+              <Stack direction="row" gap={2} alignItems="stretch">
+                {/* Player */}
+                <Card variant="outlined" sx={{ flex: 1, p: 2, textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">Ty</Typography>
+                  <motion.div
+                    animate={phase === 'countdown' ? { rotate: [-4, 4, -4] } : { rotate: 0 }}
+                    transition={phase === 'countdown' ? { repeat: Infinity, duration: 0.6 } : { duration: 0.2 }}
+                    style={{ fontSize: 48, margin: '8px 0' }}
+                  >
+                    {icon(input)}
+                  </motion.div>
+                  <Typography variant="body2" color="text.secondary">{input ?? 'â€”'}</Typography>
+                </Card>
+
+                {/* VS / Countdown */}
+                <Stack alignItems="center" justifyContent="center" sx={{ minWidth: 64 }}>
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {phase === 'countdown' ? (
+                      <motion.div key="count" initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }} style={{ fontSize: 34, fontWeight: 900 }}>
+                        {count}
+                      </motion.div>
+                    ) : (
+                      <motion.div key="vs" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                        <Chip label="VS" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Stack>
+
+                {/* CPU */}
+                <Card variant="outlined" sx={{ flex: 1, p: 2, textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">PoÄŤĂ­taÄŤ</Typography>
+                  <motion.div
+                    key={phase === 'reveal' || phase === 'finished' ? 'cpu-reveal' : 'cpu-idle'}
+                    initial={{ scale: 0.9, y: -6, opacity: 0.0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ duration: 0.28, ease: 'easeOut' }}
+                    style={{ fontSize: 48, margin: '8px 0' }}
+                  >
+                    {phase === 'idle' ? 'âť“' : icon(cpu)}
+                  </motion.div>
+                  <Typography variant="body2" color="text.secondary">{cpu ?? 'â€”'}</Typography>
+                </Card>
+              </Stack>
+
+              {/* VĂ˝sledkovĂ˝ banner */}
+              <AnimatePresence>
+                {banner && (
+                  <motion.div
+                    initial={{ y: -8, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -8, opacity: 0 }}
+                    style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}
+                  >
+                    <Chip label={banner.text} color={banner.color} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Box>
+          </Stack>
+
+          {hint && <Typography variant="body2" color="text.secondary">{hint}</Typography>}
+
+          <Stack direction="row" gap={1}>
+            {/* JedinĂ© tlaÄŤĂ­tko: vĹľdy spustĂ­ hru (Smart Play) */}
+            <Button variant="contained" onClick={handlePlay} disabled={busy || (!canPlay && phase !== 'finished')}>
+              HrĂˇt
+            </Button>
+            {!canPlay && phase !== 'finished' && (
+              <Button variant="outlined" startIcon={<RedeemIcon />} onClick={() => maybeDailyBonus(20)}>
+                DennĂ­ bonus
+              </Button>
+            )}
+            <Box flex={1} />
+            {roundRef.current && (
+              <Typography variant="caption" color="text.secondary">roundId: {roundRef.current}</Typography>
+            )}
+          </Stack>
+        </Stack>
+      </CardContent>
+
+      {/* Efekty a vĂ˝hernĂ­ overlay */}
+      <Confetti show={confettiFx} />
+      <FlyCoins show={coinsFx} toSelector="#bank-anchor" gain={overlay.payout} />
+
+      <AnimatePresence>
+        {overlay.open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }}
+            onClick={() => setOverlay((o) => ({ ...o, open: false }))}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: .9, y: 8, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: .9, y: 8, opacity: 0 }}
+              style={{ background: 'white', borderRadius: 16, padding: 24, minWidth: 280, boxShadow: '0 28px 60px rgba(0,0,0,.35)' }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="h6" fontWeight={900}>
+                  {overlay.type === 'win' ? 'VĂ˝hra!' : overlay.type === 'loss' ? 'Prohra' : 'RemĂ­za'}
+                </Typography>
+                <IconButton size="small" onClick={() => setOverlay((o) => ({ ...o, open: false }))}><CloseIcon /></IconButton>
+              </Stack>
+
+              {overlay.type === 'win' ? (
+                <Stack spacing={1.5} alignItems="center">
+                  <EmojiEventsIcon color="warning" sx={{ fontSize: 48 }} />
+                  <Typography variant="h5" fontWeight={900} color="success.main">+{overlay.payout}</Typography>
+                  <Typography variant="body2" align="center">Mince pĹ™ipsĂˇny na ĂşÄŤet. đź’°</Typography>
+                </Stack>
+              ) : overlay.type === 'loss' ? (
+                <Stack spacing={1.5} alignItems="center">
+                  <SentimentDissatisfiedIcon color="error" sx={{ fontSize: 48 }} />
+                  <Typography variant="body2" align="center">Zkus to znovu!</Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" align="center">RemĂ­za â€“ bez zmÄ›ny zĹŻstatku.</Typography>
+              )}
+
+              <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={() => setOverlay((o) => ({ ...o, open: false }))}>
+                  PokraÄŤovat
+                </Button>
+              </Stack>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
+===== src/games/rps/RPS.logic.ts =====
+
+export type RPSChoice = 'kamen' | 'nuzky' | 'papir';
+export type RPSResult = 'win' | 'loss' | 'draw';
+
+export const options: RPSChoice[] = ['kamen', 'nuzky', 'papir'];
+
+export const icon = (v?: RPSChoice | null) =>
+  v === 'kamen' ? 'âśŠ' : v === 'nuzky' ? 'âśŚď¸Ź' : v === 'papir' ? 'âś‹' : 'âť“';
+
+const beats: Record<RPSChoice, RPSChoice> = {
+  kamen: 'nuzky',
+  nuzky: 'papir',
+  papir: 'kamen',
+};
+
+export const normalize = (s: string): string =>
+  (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+export const toChoice = (s: string): RPSChoice | null => {
+  const n = normalize(s);
+  if (n === 'kamen' || n === 'nuzky' || n === 'papir') return n;
+  return null;
+};
+
+export const decide = (player: RPSChoice, cpu: RPSChoice): RPSResult => {
+  if (player === cpu) return 'draw';
+  return beats[player] === cpu ? 'win' : 'loss';
+};
+
+export const randomChoice = (): RPSChoice => options[Math.floor(Math.random() * options.length)];
+
+===== src/games/solitaire/Solitaire.ui.tsx =====
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Card as MUICard, CardContent, Stack, Typography, Chip, Button, Box, Divider, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useCasino } from '@games/core/useCasino';
+import { FlyCoins } from '@shared/fx/FlyCoins';
+import { Confetti } from '@shared/fx/Confetti';
+
+import {
+  SUITS, RANKS, Card as K, State, deal, canOnTableau, canOnFound, isValidStack, deep,
+  trySolve, generateDealForDifficulty, isRed,
+} from './Solitaire.logic';
+
+type Difficulty = 'easy'|'medium'|'hard'|'extreme';
+
+export default function Solitaire() {
+  const GAME_KEY = 'hilo-solitaire' as const; // unikĂˇtnĂ­ klĂ­ÄŤ do cenĂ­ku / historie
+  const { balance, priceTable, defaultPayout, startRound, finishRound } = useCasino();
+
+  const [price, setPrice] = useState(() => priceTable?.hilo?.entry ?? 6);
+  const [payoutWin, setPayoutWin] = useState(() => priceTable?.hilo?.win ?? 18);
+
+  const [phase, setPhase] = useState<'idle'|'playing'|'auto'|'won'|'lost'>('idle');
+  const [drawMode, setDrawMode] = useState<1|3>(1);
+  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+
+  const [state, setState] = useState<State>(() => deal(drawMode));
+  const [selected, setSelected] = useState<{ from: 'waste' } | { from: 'tableau'; col: number; index: number } | null>(null);
+  const [steps, setSteps] = useState(0);
+  const [msg, setMsg] = useState('Zvol obtĂ­Ĺľnost a klikni na NovĂˇ hra.');
+
+  const undoRef = useRef<State[]>([]);
+  const roundRef = useRef<string | null>(null);
+
+  // efekty po vĂ˝hĹ™e
+  const [overlay, setOverlay] = useState<{ open: boolean; payout: number }>({ open: false, payout: 0 });
+  const [coinsFx, setCoinsFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+
+  useEffect(() => {
+    const pt = priceTable?.hilo;
+    if (pt?.entry != null) setPrice(pt.entry|0);
+    if (pt?.win != null) setPayoutWin(pt.win|0);
+  }, [priceTable]);
+
+  // detekce vĂ˝hry
+  useEffect(() => {
+    const won = SUITS.every((s) => state.found[s].length === 13);
+    if ((phase === 'playing' || phase === 'auto') && won) {
+      setPhase('won');
+      setMsg('VyhrĂˇl jsi! đźŽ‰');
+      const payout = defaultPayout(GAME_KEY as any, 'win') ?? payoutWin;
+      finishRound(GAME_KEY as any, { roundId: roundRef.current!, result: 'win', payout, details: { drawMode, difficulty, steps } });
+      roundRef.current = null;
+
+      // efekty + overlay + mince do banku
+      setOverlay({ open: true, payout });
+      setCoinsFx(true); setConfettiFx(true);
+      setTimeout(() => { setCoinsFx(false); setConfettiFx(false); }, 1200);
+    }
+  }, [state, phase, drawMode, difficulty, steps, payoutWin, defaultPayout, finishRound]);
+
+  const pushUndo = () => {
+    undoRef.current.push(deep(state));
+    if (undoRef.current.length > 200) undoRef.current.shift();
+  };
+  const undo = () => {
+    if (!undoRef.current.length) return;
+    const last = undoRef.current.pop()!;
+    setState(last);
+    setSelected(null);
+    setPhase('playing');
+    setMsg('Krok zpÄ›t.');
+  };
+
+  const startGame = () => {
+    if (phase === 'playing' || phase === 'auto') return;
+    const st = startRound(GAME_KEY as any, { drawMode, difficulty });
+    if (!st?.ok) { setMsg('NemĂˇĹˇ dost mincĂ­ pro start.'); return; }
+    roundRef.current = st.roundId;
+
+    setMsg(`MĂ­chĂˇm balĂ­ÄŤek (${difficulty})â€¦`);
+    const picked = generateDealForDifficulty(drawMode, difficulty);
+    if (!picked) {
+      const d = deal(drawMode);
+      setState(d);
+      setMsg('RozdĂˇno (fallback).');
+    } else {
+      setState(picked.deal);
+      setMsg(
+        difficulty === 'easy' ? 'RozdĂˇno â€“ hodnÄ› hratelnĂ˝ layout đź‘Ť'
+        : difficulty === 'medium' ? 'RozdĂˇno â€“ spĂ­Ĺˇ pĹ™Ă­vÄ›tivĂ©.'
+        : difficulty === 'hard' ? 'RozdĂˇno â€“ nĂˇroÄŤnÄ›jĹˇĂ­ kolo.'
+        : 'RozdĂˇno â€“ extrĂ©mnÄ› utaĹľenĂ©. Bez chyby!'
+      );
+    }
+    undoRef.current = [];
+    setSelected(null);
+    setSteps(0);
+    setPhase('playing');
+  };
+
+  const giveUp = () => {
+    if (phase !== 'playing' && phase !== 'auto') return;
+    setPhase('lost');
+    setMsg('VzdĂˇno.');
+    const payout = defaultPayout(GAME_KEY as any, 'loss') ?? 0;
+    finishRound(GAME_KEY as any, { roundId: roundRef.current!, result: 'loss', payout, details: { drawMode, difficulty } });
+    roundRef.current = null;
+  };
+
+  const autoFlip = (st: State) => {
+    const cols = st.tableau.map((col) => {
+      if (!col.length) return col;
+      const top = col[col.length - 1];
+      return top.faceUp ? col : [...col.slice(0, -1), { ...top, faceUp: true }];
+    });
+    return { ...st, tableau: cols };
+  };
+
+  // === Akce ===
+  const drawFromStock = () => {
+    if (phase !== 'playing') return;
+    pushUndo();
+    const st = deep(state);
+    if (st.stock.length === 0) {
+      if (!st.waste.length) { undoRef.current.pop(); return; }
+      st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+      st.waste = [];
+      setState(st); setSelected(null); setMsg('Recyklace balĂ­ÄŤku.');
+      return;
+    }
+    const n = Math.min(st.drawMode, st.stock.length);
+    const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+    st.stock = st.stock.slice(0, st.stock.length - n);
+    st.waste = st.waste.concat(take);
+    setState(st); setSelected(null);
+  };
+
+  const tryAutoMoveToFoundation = (from: { kind: 'waste' } | { kind: 'tableau'; col: number }) => {
+    if (phase !== 'playing') return false;
+    const st = deep(state);
+
+    if (from.kind === 'waste') {
+      const card = st.waste[st.waste.length - 1]; if (!card) return false;
+      const pile = st.found[card.suit];
+      if (!canOnFound(card, pile)) return false;
+      pushUndo();
+      st.waste.pop(); pile.push(card);
+      setState(autoFlip(st)); setSelected(null); return true;
+    }
+    if (from.kind === 'tableau') {
+      const col = st.tableau[from.col];
+      if (!col?.length) return false;
+      const top = col[col.length - 1]; if (!top?.faceUp) return false;
+      const pile = st.found[top.suit];
+      if (!canOnFound(top, pile)) return false;
+      pushUndo();
+      col.pop(); pile.push(top);
+      setState(autoFlip(st)); setSelected(null); return true;
+    }
+    return false;
+  };
+
+  const moveWasteToTableau = (toCol: number) => {
+    const st = deep(state);
+    const top = st.waste[st.waste.length - 1]; if (!top) return;
+    const target = st.tableau[toCol][st.tableau[toCol].length - 1] || null;
+    if (!canOnTableau(top, target)) return;
+    pushUndo();
+    st.waste.pop();
+    st.tableau[toCol] = [...st.tableau[toCol], top];
+    setState(autoFlip(st)); setSelected(null);
+  };
+
+  const moveTableauToTableau = (toCol: number, fromCol: number, fromIndex: number) => {
+    const st = deep(state);
+    const src = st.tableau[fromCol];
+    const stack = src.slice(fromIndex);
+    if (!stack.length || !isValidStack(stack)) return;
+    const target = st.tableau[toCol][st.tableau[toCol].length - 1] || null;
+    if (!canOnTableau(stack[0], target)) return;
+    if (!st.tableau[toCol].length && stack[0].rank !== 'K') return;
+    pushUndo();
+    st.tableau[fromCol] = st.tableau[fromCol].slice(0, fromIndex);
+    st.tableau[toCol] = [...st.tableau[toCol], ...stack];
+    setState(autoFlip(st)); setSelected(null);
+  };
+
+  const moveToFoundation = (suit: K['suit'], payload: { src: 'waste' } | { src: 'tableau'; col: number; index: number }) => {
+    const st = deep(state);
+    const pile = st.found[suit];
+    if (payload.src === 'waste') {
+      const card = st.waste[st.waste.length - 1];
+      if (!card || !canOnFound(card, pile)) return;
+      pushUndo();
+      st.waste.pop(); pile.push(card);
+      setState(autoFlip(st)); setSelected(null); return;
+    }
+    const topIndex = st.tableau[payload.col].length - 1;
+    if (payload.index !== topIndex) return;
+    const card = st.tableau[payload.col][topIndex];
+    if (!canOnFound(card, pile)) return;
+    pushUndo();
+    st.tableau[payload.col] = st.tableau[payload.col].slice(0, topIndex);
+    pile.push(card);
+    setState(autoFlip(st)); setSelected(null);
+  };
+
+  // === Klik logika (zĂˇklad + double-click auto-move) ===
+  const clickStock = () => drawFromStock();
+  const clickWaste = () => {
+    if (phase !== 'playing' || !state.waste.length) return;
+    const topId = state.waste[state.waste.length - 1].id;
+    if (selected?.from === 'waste') {
+      if (!tryAutoMoveToFoundation({ kind: 'waste' })) setSelected(null);
+      return;
+    }
+    setSelected({ from: 'waste' });
+  };
+  const clickTableau = (colIdx: number, index: number) => {
+    if (phase !== 'playing') return;
+    const card = state.tableau[colIdx][index];
+    if (!card.faceUp) {
+      if (index === state.tableau[colIdx].length - 1) {
+        pushUndo();
+        const st = deep(state);
+        st.tableau[colIdx][index] = { ...card, faceUp: true };
+        setState(st);
+      }
+      return;
+    }
+    if (selected?.from === 'tableau' && selected.col === colIdx && selected.index === index && index === state.tableau[colIdx].length - 1) {
+      if (!tryAutoMoveToFoundation({ kind: 'tableau', col: colIdx })) setSelected(null);
+      return;
+    }
+    if (!selected) { setSelected({ from: 'tableau', col: colIdx, index }); return; }
+
+    const target = state.tableau[colIdx][state.tableau[colIdx].length - 1] || null;
+
+    if (selected.from === 'waste') {
+      const top = state.waste[state.waste.length - 1]; if (!top) return;
+      if (!canOnTableau(top, target)) { setMsg('Sem to nejde.'); return; }
+      moveWasteToTableau(colIdx); return;
+    }
+    if (selected.from === 'tableau') {
+      const { col, index: srcIndex } = selected;
+      const stack = state.tableau[col].slice(srcIndex);
+      if (!isValidStack(stack) || !canOnTableau(stack[0], target)) { setMsg('Sem to nejde.'); return; }
+      if (!state.tableau[colIdx].length && stack[0].rank !== 'K') { setMsg('PrĂˇzdnĂ˝ sloupec â€“ jen s krĂˇlem.'); return; }
+      moveTableauToTableau(colIdx, col, srcIndex); return;
+    }
+  };
+  const clickEmptyCol = (colIdx: number) => {
+    if (!selected) return;
+    if (selected.from === 'waste') {
+      const top = state.waste[state.waste.length - 1];
+      if (!top || top.rank !== 'K') return;
+      pushUndo();
+      const st = deep(state);
+      st.waste = st.waste.slice(0, -1);
+      st.tableau[colIdx] = [...st.tableau[colIdx], top];
+      setState(st); setSelected(null); return;
+    }
+    if (selected.from === 'tableau') {
+      const { col, index } = selected;
+      const stack = state.tableau[col].slice(index);
+      if (!isValidStack(stack) || stack[0].rank !== 'K') return;
+      moveTableauToTableau(colIdx, col, index); return;
+    }
+  };
+
+  // === Auto-win tlaÄŤĂ­tko
+  const autoWin = () => {
+    if (phase !== 'playing') return;
+    const current = deep(state);
+    const solved = trySolve(current);
+    if (!solved.ok) { setMsg('Solver to teÄŹ nedĂˇ. Zkus pĂˇr tahĹŻ a znovu Auto-win.'); return; }
+    setMsg('Auto-win âś¨'); setPhase('auto'); setSelected(null);
+
+    let st = deep(current);
+    const path = solved.path.slice();
+    const apply = (mv: any) => {
+      switch (mv.type) {
+        case 'flip': {
+          const col = st.tableau[mv.col];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'waste_to_found': {
+          const card = st.waste.pop();
+          if (card) st.found[card.suit].push(card);
+          break;
+        }
+        case 'tab_to_found': {
+          const top = st.tableau[mv.from].pop();
+          if (top) st.found[top.suit].push(top);
+          const col = st.tableau[mv.from];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'tab_to_tab': {
+          const stack = st.tableau[mv.from].slice(mv.index);
+          st.tableau[mv.from] = st.tableau[mv.from].slice(0, mv.index);
+          st.tableau[mv.to] = st.tableau[mv.to].concat(stack);
+          const col = st.tableau[mv.from];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'waste_to_tab':
+        case 'waste_to_tab_empty': {
+          const card = st.waste.pop();
+          if (card) st.tableau[mv.to].push(card);
+          break;
+        }
+        case 'recycle': {
+          st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+          st.waste = [];
+          break;
+        }
+        case 'draw': {
+          const n = Math.min(st.drawMode, st.stock.length);
+          const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+          st.stock = st.stock.slice(0, st.stock.length - n);
+          st.waste = st.waste.concat(take);
+          break;
+        }
+      }
+    };
+
+    const tick = () => {
+      if (!path.length) {
+        setState(st);
+        setPhase('playing'); // nechĂˇme useEffect detekovat WIN
+        return;
+      }
+      for (let i = 0; i < 3 && path.length; i++) apply(path.shift());
+      setState(deep(st));
+      setTimeout(tick, 90);
+    };
+    tick();
+  };
+
+  // ===== Render =====
+  const offDown = 18, offUp = 28;
+  const canStart = phase !== 'playing' && phase !== 'auto' && balance >= (price | 0);
+
+  const CardFace = ({ c, sel, onDoubleClick }: { c: K; sel?: boolean; onDoubleClick?: () => void }) => (
+    <div className={`sol-card faceUp ${isRed(c.suit) ? 'red' : ''} ${sel ? 'sel' : ''}`} onDoubleClick={onDoubleClick}>
+      <div className="rank">{c.rank}<br/>{c.suit}</div>
+      <div className="pip">{c.rank}{c.suit}</div>
+      <div className="rank br">{c.rank}<br/>{c.suit}</div>
+    </div>
+  );
+  const CardDown = () => <div className="sol-card faceDown" />;
+
+  return (
+    <MUICard variant="outlined" sx={{ overflow: 'visible' }}>
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Top bar */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+              <Chip label={`đź’° ${balance}`} />
+              <Chip variant="outlined" label={`Vstup: -${price} â€˘ VĂ˝hra: +${payoutWin}`} />
+              <Chip variant="outlined" label={`Kroky: ${steps}`} />
+              <Chip variant="outlined" label={`Draw: ${drawMode} â€˘ ReĹľim: ${difficulty}`} />
+            </Stack>
+          </Stack>
+
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <select className="mg-select" value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} disabled={phase==='playing'||phase==='auto'}>
+              <option value="easy">LehkĂˇ</option>
+              <option value="medium">StĹ™ednĂ­</option>
+              <option value="hard">TÄ›ĹľkĂˇ</option>
+              <option value="extreme">ExtrĂ©mnĂ­</option>
+            </select>
+            <Button variant="contained" disabled={!canStart} onClick={startGame}>NovĂˇ hra</Button>
+            <Button variant="outlined" disabled={undoRef.current.length===0 || phase==='idle'} onClick={undo}>Undo</Button>
+            <Button variant="outlined" disabled={phase==='playing' || phase==='auto'} onClick={() => setDrawMode(d => d===1?3:1)}>
+              PĹ™epnout {drawMode===1 ? 'na 3-card' : 'na 1-card'}
+            </Button>
+            <Button variant="outlined" disabled={phase!=='playing'} onClick={autoWin}>Auto-win</Button>
+            <Button variant="outlined" disabled={phase!=='playing' && phase!=='auto'} onClick={giveUp}>VzdĂˇt</Button>
+          </Stack>
+
+          <Divider />
+
+          {/* BOARD */}
+          <div className="sol-board">
+            <div className="sol-row">
+              <div className="sol-side">
+                {/* STOCK */}
+                <div className="sol-pile" onClick={clickStock} title="Stock (klik = dobĂ­rat / recyklovat)">
+                  {state.stock.length ? <CardDown/> : <div className="sol-mini" style={{ padding: 6 }}>PrĂˇzdnĂ˝ (klik = recyklace)</div>}
+                </div>
+
+                {/* WASTE fan */}
+                <div className="sol-wasteFan">
+                  {state.waste.slice(-3).map((c, i, arr) => {
+                    const isTop = i === arr.length - 1;
+                    const sel = selected?.from === 'waste';
+                    return (
+                      <div key={c.id} className="slot" style={{ left: i*10 }} onClick={clickWaste}>
+                        <CardFace c={c} sel={sel && isTop} onDoubleClick={() => tryAutoMoveToFoundation({ kind: 'waste' })} />
+                      </div>
+                    );
+                  })}
+                  {state.waste.length===0 && (
+                    <div className="sol-mini" style={{ position:'absolute', top:'40%', left:0, right:0, textAlign:'center' }}>Waste</div>
+                  )}
+                </div>
+              </div>
+
+              {/* FOUNDATIONS */}
+              <div className="sol-found">
+                {SUITS.map((s) => {
+                  const pile = state.found[s];
+                  const top = pile[pile.length - 1] || null;
+                  return (
+                    <div key={s} className="sol-pile" title={`Foundation ${s}`}
+                      onClick={() => {
+                        if (!selected) return;
+                        if (selected.from === 'waste') return moveToFoundation(s, { src:'waste' });
+                        if (selected.from === 'tableau') return moveToFoundation(s, { src:'tableau', col:selected.col, index:selected.index });
+                      }}>
+                      {top ? <CardFace c={top}/> : <div className="sol-mini" style={{ padding: 6 }}>{s}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* TABLEAU */}
+            <div className="sol-tableau">
+              {state.tableau.map((col, ci) => {
+                const height = col.reduce((h, c) => h + (c.faceUp ? offUp : offDown), 0) + 6 + 116;
+                return (
+                  <div key={ci} className="sol-col" style={{ minHeight: Math.max(height, 190) }}
+                    onClick={() => { if (!col.length) clickEmptyCol(ci); }}>
+                    <div className="sol-fan" style={{ height }}>
+                      {col.map((c, idx) => {
+                        const y = col.slice(0, idx).reduce((p, cc) => p + (cc.faceUp ? offUp : offDown), 0);
+                        const sel = selected?.from === 'tableau' && selected.col === ci && selected.index === idx;
+                        const isTop = idx === col.length - 1;
+                        return (
+                          <div key={c.id} className="slot" style={{ top: y }} onClick={() => clickTableau(ci, idx)}>
+                            {c.faceUp ? (
+                              <CardFace c={c} sel={sel} onDoubleClick={() => { if (isTop) tryAutoMoveToFoundation({ kind: 'tableau', col: ci }); }} />
+                            ) : (<CardDown />)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* status */}
+          {msg && (
+            <div className="sol-msg">
+              <span className={phase==='won' ? 'mg-badge mg-badge--win' : phase==='lost' ? 'mg-badge mg-badge--lose' : 'mg-badge mg-badge--draw'}>
+                {msg}
+              </span>
+            </div>
+          )}
+        </Stack>
+      </CardContent>
+
+      {/* Efekty */}
+      <Confetti show={confettiFx} />
+      <FlyCoins show={coinsFx} toSelector="#bank-anchor" gain={overlay.payout} />
+
+      {/* Overlay po vĂ˝hĹ™e */}
+      <AnimatePresence>
+        {overlay.open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }}
+            onClick={() => setOverlay({ ...overlay, open: false })}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: .96, y: 8, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: .96, y: 8, opacity: 0 }}
+              style={{ background: 'white', borderRadius: 16, padding: 24, minWidth: 280, boxShadow: '0 28px 60px rgba(0,0,0,.35)' }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="h6" fontWeight={900}>VĂ˝hra!</Typography>
+                <IconButton size="small" onClick={() => setOverlay({ ...overlay, open: false })}><CloseIcon /></IconButton>
+              </Stack>
+              <Typography variant="h5" fontWeight={900} color="success.main" align="center">+{overlay.payout}</Typography>
+              <Typography variant="body2" align="center" sx={{ mt: 1 }}>Mince pĹ™ipsĂˇny na ĂşÄŤet. đź’°</Typography>
+              <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={() => setOverlay({ ...overlay, open: false })}>PokraÄŤovat</Button>
+              </Stack>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </MUICard>
+  );
+}
+
+===== src/games/solitaire/Solitaire.logic.ts =====
+
+export type Suit = 'â™ ' | 'â™Ą' | 'â™¦' | 'â™Ł';
+export type Rank = 'A'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9'|'10'|'J'|'Q'|'K';
+
+export type Card = {
+  id: string;
+  suit: Suit;
+  rank: Rank;
+  faceUp: boolean;
+};
+
+export type State = {
+  tableau: Card[][];
+  stock: Card[];
+  waste: Card[];
+  found: Record<Suit, Card[]>;
+  drawMode: 1 | 3;
+};
+
+export type Move =
+  | { type: 'flip'; col: number }
+  | { type: 'waste_to_found'; suit: Suit }
+  | { type: 'tab_to_found'; from: number; suit: Suit }
+  | { type: 'tab_to_tab'; from: number; index: number; to: number }
+  | { type: 'waste_to_tab'; to: number }
+  | { type: 'waste_to_tab_empty'; to: number }
+  | { type: 'recycle' }
+  | { type: 'draw'; n: number };
+
+export const SUITS: Suit[] = ['â™ ', 'â™Ą', 'â™¦', 'â™Ł'];
+export const RANKS: Rank[] = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+export const isRed = (s: Suit) => s === 'â™Ą' || s === 'â™¦';
+export const vRank = (r: Rank) =>
+  r === 'A' ? 1 : r === 'J' ? 11 : r === 'Q' ? 12 : r === 'K' ? 13 : parseInt(r, 10);
+
+export const deep = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+
+export function makeDeck(): Card[] {
+  const d: Card[] = [];
+  for (const s of SUITS) for (const r of RANKS) {
+    d.push({ id: `${r}${s}-${Math.random().toString(36).slice(2, 8)}`, suit: s, rank: r, faceUp: false });
+  }
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+export function canOnTableau(movingTop: Card | null, targetTop: Card | null): boolean {
+  if (!movingTop) return false;
+  if (!targetTop) return movingTop.rank === 'K';
+  return isRed(movingTop.suit) !== isRed(targetTop.suit) && vRank(movingTop.rank) === vRank(targetTop.rank) - 1;
+}
+
+export function canOnFound(card: Card | null, pile: Card[]): boolean {
+  if (!card) return false;
+  if (!pile.length) return card.rank === 'A';
+  const top = pile[pile.length - 1];
+  return card.suit === top.suit && vRank(card.rank) === vRank(top.rank) + 1;
+}
+
+export function isValidStack(arr: Card[]): boolean {
+  if (!arr.length || !arr[0].faceUp) return false;
+  for (let i = 0; i < arr.length - 1; i++) {
+    const a = arr[i], b = arr[i + 1];
+    if (!b.faceUp) return false;
+    if (isRed(a.suit) === isRed(b.suit)) return false;
+    if (vRank(a.rank) !== vRank(b.rank) + 1) return false;
+  }
+  return true;
+}
+
+export function deal(drawMode: 1 | 3 = 1): State {
+  const deck = makeDeck();
+  const tableau: Card[][] = Array.from({ length: 7 }, () => []);
+  let idx = 0;
+  for (let c = 0; c < 7; c++) {
+    for (let r = 0; r <= c; r++) {
+      const card = deck[idx++];
+      card.faceUp = r === c;
+      tableau[c].push(card);
+    }
+  }
+  return {
+    tableau,
+    stock: deck.slice(idx),
+    waste: [],
+    found: { 'â™ ': [], 'â™Ą': [], 'â™¦': [], 'â™Ł': [] },
+    drawMode,
+  };
+}
+
+/** Greedy solver â€“ pro Auto-win / Extreme enforcement */
+export function trySolve(initial: State) {
+  const MAX_ITERS = 1200;
+  const seen = new Set<string>();
+  const path: Move[] = [];
+
+  const key = (st: State) =>
+    JSON.stringify({
+      t: st.tableau.map((c) => c.map((k) => [k.rank, k.suit, k.faceUp])),
+      w: st.waste.map((k) => [k.rank, k.suit]),
+      s: st.stock.length,
+      f: SUITS.map((s) => st.found[s].length),
+      d: st.drawMode,
+    });
+
+  const flipIfPossible = (st: State, colIdx: number) => {
+    const col = st.tableau[colIdx];
+    if (col.length && !col[col.length - 1].faceUp) {
+      col[col.length - 1].faceUp = true;
+      path.push({ type: 'flip', col: colIdx });
+      return true;
+    }
+    return false;
+  };
+
+  const moveToFoundation = (st: State) => {
+    const topW = st.waste[st.waste.length - 1];
+    if (topW) {
+      const dest = st.found[topW.suit];
+      if (canOnFound(topW, dest)) {
+        st.waste.pop();
+        dest.push(topW);
+        path.push({ type: 'waste_to_found', suit: topW.suit });
+        return true;
+      }
+    }
+    for (let c = 0; c < 7; c++) {
+      const col = st.tableau[c];
+      if (!col.length) continue;
+      const top = col[col.length - 1];
+      if (!top.faceUp) continue;
+      const dest = st.found[top.suit];
+      if (canOnFound(top, dest)) {
+        col.pop();
+        dest.push(top);
+        path.push({ type: 'tab_to_found', from: c, suit: top.suit });
+        flipIfPossible(st, c);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const moveToTableau = (st: State) => {
+    for (let c = 0; c < 7; c++) {
+      const col = st.tableau[c];
+      for (let i = 0; i < col.length; i++) {
+        const card = col[i];
+        if (!card.faceUp) continue;
+        const stack = col.slice(i);
+        if (!isValidStack(stack)) continue;
+        for (let d = 0; d < 7; d++) {
+          if (d === c) continue;
+          const tgtTop = st.tableau[d][st.tableau[d].length - 1] || null;
+          if (canOnTableau(stack[0], tgtTop)) {
+            if (!st.tableau[d].length && stack[0].rank !== 'K') continue;
+            st.tableau[d] = st.tableau[d].concat(stack);
+            st.tableau[c] = st.tableau[c].slice(0, i);
+            path.push({ type: 'tab_to_tab', from: c, index: i, to: d });
+            flipIfPossible(st, c);
+            return true;
+          }
+        }
+      }
+    }
+    const topW = st.waste[st.waste.length - 1];
+    if (topW) {
+      for (let d = 0; d < 7; d++) {
+        const tgtTop = st.tableau[d][st.tableau[d].length - 1] || null;
+        if (canOnTableau(topW, tgtTop)) {
+          st.tableau[d].push(topW);
+          st.waste.pop();
+          path.push({ type: 'waste_to_tab', to: d });
+          return true;
+        }
+        if (!st.tableau[d].length && topW.rank === 'K') {
+          st.tableau[d].push(topW);
+          st.waste.pop();
+          path.push({ type: 'waste_to_tab_empty', to: d });
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const draw = (st: State) => {
+    if (st.stock.length === 0) {
+      if (!st.waste.length) return false;
+      st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+      st.waste = [];
+      path.push({ type: 'recycle' });
+      return true;
+    }
+    const n = Math.min(st.drawMode, st.stock.length);
+    const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+    st.stock = st.stock.slice(0, st.stock.length - n);
+    st.waste = st.waste.concat(take);
+    path.push({ type: 'draw', n });
+    return true;
+  };
+
+  const isWin = (st: State) => SUITS.every((s) => st.found[s].length === 13);
+
+  let it = 0;
+  let st = deep(initial);
+  while (it++ < MAX_ITERS) {
+    if (isWin(st)) return { ok: true as const, path };
+    const snap = key(st);
+    if (seen.has(snap)) {
+      if (!draw(st)) break;
+      continue;
+    }
+    seen.add(snap);
+
+    if (moveToFoundation(st)) continue;
+    if (moveToTableau(st)) continue;
+    if (draw(st)) continue;
+    break;
+  }
+  return { ok: false as const, path: [] as Move[] };
+}
+
+export function easeScore(initial: State, solutionPath: Move[]) {
+  const total = solutionPath.length;
+  const firstN = solutionPath.slice(0, 30);
+  const earlyFound = firstN.filter((m) => m.type === 'tab_to_found' || m.type === 'waste_to_found').length;
+  const flips = solutionPath.filter((m) => m.type === 'flip').length;
+  const recycles = solutionPath.filter((m) => m.type === 'recycle').length;
+  const initialAcesVisible = initial.tableau.reduce((acc, col) => {
+    const top = col[col.length - 1];
+    return acc + (top && top.rank === 'A' ? 1 : 0);
+  }, 0);
+  return 300 - total + 6 * earlyFound + 2 * flips + 8 * initialAcesVisible - 12 * recycles;
+}
+
+export function pickByDifficulty<T extends { score: number }>(candidates: T[], difficulty: 'easy'|'medium'|'hard'|'extreme') {
+  candidates.sort((a, b) => a.score - b.score); // low=hard, high=easy
+  const pickIndex = (() => {
+    if (difficulty === 'easy') return candidates.length - 1;
+    if (difficulty === 'medium') return Math.floor(0.8 * (candidates.length - 1));
+    if (difficulty === 'hard') return Math.floor(0.3 * (candidates.length - 1));
+    return 0; // extreme
+  })();
+  return candidates[Math.max(0, Math.min(candidates.length - 1, pickIndex))];
+}
+
+export function generateDealForDifficulty(drawMode: 1|3, difficulty: 'easy'|'medium'|'hard'|'extreme') {
+  const tries = difficulty === 'easy' ? 60 : difficulty === 'medium' ? 45 : difficulty === 'hard' ? 45 : 60;
+  const candidates: { deal: State; solution: { ok: true; path: Move[] }; score: number }[] = [];
+  for (let i = 0; i < tries; i++) {
+    const d = deal(drawMode);
+    const solved = trySolve(deep(d));
+    if (!solved.ok) continue;
+    const score = easeScore(d, solved.path);
+    candidates.push({ deal: d, solution: solved as any, score });
+  }
+  if (!candidates.length) {
+    for (let i = 0; i < 50; i++) {
+      const d = deal(drawMode);
+      const solved = trySolve(deep(d));
+      if (solved.ok) return { deal: d, solution: solved as any };
+    }
+    return null;
+  }
+  return pickByDifficulty(candidates, difficulty);
+}
+
+===== src/games/solitaire/index.ts =====
+
+export { default as Solitaire } from './Solitaire.ui';

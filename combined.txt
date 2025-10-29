@@ -1,0 +1,636 @@
+﻿
+===== src/games/core/casino.types.ts =====
+
+export type GameKey =
+  | 'RPS'
+  | 'numberGuesor'
+  | 'hilo'
+  | 'diceDuel'
+  | 'hangman'
+  | 'blackJack'
+  | 'solitaire'
+  | (string & {}); // rozĹˇiĹ™itelnĂ©
+
+export type RoundResult = 'win' | 'loss' | 'draw';
+
+export interface PriceEntry {
+  entry: number;
+  win?: number;
+  draw?: number;
+}
+
+export type PriceTable = Record<GameKey, PriceEntry>;
+
+export interface CasinoConfig {
+  startBalance: number;
+  storageKey: string;
+  priceTable: PriceTable;
+}
+
+export interface RoundHistory {
+  gameKey: GameKey;
+  roundId: string;
+  ts: number;
+  entry: number;
+  result: RoundResult | null;
+  payout: number;
+  meta?: any;
+  details?: any;
+}
+
+export interface Aggregate {
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  coinsWon: number;
+  coinsLost: number;
+  bestStreak: number;
+  curStreak: number;
+}
+
+export interface StatsSnapshot {
+  global: EnrichedAgg;
+  byGame: Record<string, EnrichedAgg>;
+}
+
+export interface EnrichedAgg extends Aggregate {
+  winRate: number;
+  net: number;
+}
+
+export interface CasinoState {
+  balance: number;
+  history: RoundHistory[];
+  aggregate: {
+    global: Aggregate;
+    byGame: Record<string, Aggregate>;
+  };
+  daily: {
+    lastYMD: string | null;
+    amount: number;
+  };
+}
+
+export type CasinoEventType =
+  | 'init'
+  | 'balance'
+  | 'roundStart'
+  | 'roundFinish'
+  | 'dailyBonus'
+  | 'reset';
+
+export interface CasinoEvent<T = any> {
+  type: CasinoEventType;
+  payload?: T;
+}
+
+===== src/games/core/casino.ts =====
+
+import {
+  Aggregate,
+  CasinoConfig,
+  CasinoEvent,
+  CasinoState,
+  GameKey,
+  PriceTable,
+  RoundResult,
+  StatsSnapshot,
+} from './casino.types';
+
+type Listener = (evt: CasinoEvent) => void;
+
+const DEFAULTS: CasinoConfig = {
+  startBalance: 250,
+  storageKey: 'casino_v2_state',
+  priceTable: {
+    RPS: { entry: 5, win: 10, draw: 3 },
+    numberGuesor: { entry: 5, win: 10, draw: 0 },
+    hilo: { entry: 6, win: 12, draw: 0 },
+    diceDuel: { entry: 7, win: 14, draw: 5 },
+    hangman: { entry: 6, win: 18, draw: 0 },
+    blackJack: { entry: 0 }, // speciĂˇl
+    solitaire: { entry: 6, win: 18, draw: 0 },
+  } as PriceTable,
+};
+
+const listeners = new Set<Listener>();
+let cfg: CasinoConfig = DEFAULTS;
+let state: CasinoState;
+
+const ymd = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const i32 = (v: any, min = 0) => Math.max(min, Math.floor(Number(v) || 0));
+
+const LS = {
+  load<T>(key: string, fallback: T): T {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  save<T>(key: string, value: T) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  },
+};
+
+const baseAgg = (): Aggregate => ({
+  games: 0,
+  wins: 0,
+  losses: 0,
+  draws: 0,
+  coinsWon: 0,
+  coinsLost: 0,
+  bestStreak: 0,
+  curStreak: 0,
+});
+
+const freshState = (): CasinoState => ({
+  balance: cfg.startBalance,
+  history: [],
+  aggregate: { global: baseAgg(), byGame: {} },
+  daily: { lastYMD: null, amount: 0 },
+});
+
+const ensureGameAgg = (key: string) => {
+  const g = state.aggregate.byGame[key];
+  if (g) return g;
+  state.aggregate.byGame[key] = baseAgg();
+  return state.aggregate.byGame[key];
+};
+
+const save = () => LS.save(cfg.storageKey, state);
+const emit = (type: CasinoEvent['type'], payload?: any) => {
+  listeners.forEach((fn) => {
+    try {
+      fn({ type, payload });
+    } catch {}
+  });
+};
+
+const setBalance = (v: number) => {
+  state.balance = i32(v);
+  save();
+  emit('balance', { balance: state.balance });
+};
+
+export const Casino = {
+  init(options?: Partial<CasinoConfig>) {
+    const prevKey = options?.storageKey ?? DEFAULTS.storageKey;
+    cfg = {
+      startBalance: i32(options?.startBalance ?? DEFAULTS.startBalance),
+      storageKey: prevKey,
+      priceTable: { ...DEFAULTS.priceTable, ...(options?.priceTable ?? {}) },
+    };
+    const legacy = LS.load<CasinoState | null>('casino_v1_state', null);
+    const loaded = LS.load<CasinoState | null>(cfg.storageKey, legacy);
+    state = loaded && typeof loaded === 'object' ? { ...freshState(), ...loaded } : freshState();
+    save();
+    emit('init', { balance: state.balance, cfg });
+    return { balance: state.balance, cfg };
+  },
+
+  get config() {
+    // deep copy kvĹŻli imutabilitÄ› venku
+    return JSON.parse(JSON.stringify(cfg)) as CasinoConfig;
+  },
+
+  getBalance() {
+    return state?.balance ?? 0;
+  },
+
+  canAfford(cost: number) {
+    return state.balance >= i32(cost);
+  },
+
+  spend(cost: number) {
+    cost = i32(cost);
+    if (cost === 0) return true;
+    if (state.balance < cost) return false;
+    setBalance(state.balance - cost);
+    return true;
+  },
+
+  payout(amount: number) {
+    amount = i32(amount);
+    if (amount > 0) setBalance(state.balance + amount);
+  },
+
+  startRound(gameKey: GameKey, meta?: any) {
+    const entry = i32(cfg.priceTable[gameKey]?.entry ?? 0);
+    if (entry > 0 && !this.spend(entry)) {
+      return { ok: false as const, reason: 'INSUFFICIENT_FUNDS' as const };
+    }
+    const roundId = `${gameKey}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    state.history.push({ gameKey, roundId, ts: Date.now(), entry, result: null, payout: 0, meta: meta ?? null });
+    state.aggregate.global.games++;
+    ensureGameAgg(gameKey).games++;
+    save();
+    emit('roundStart', { gameKey, roundId, entry });
+    return { ok: true as const, roundId };
+  },
+
+  finishRound(
+    gameKey: GameKey,
+    opts: { roundId: string; result: RoundResult; payout: number; details?: any },
+  ) {
+    const { roundId, result } = opts;
+    if (!['win', 'loss', 'draw'].includes(result)) return;
+
+    const hist = state.history.find((h) => h.roundId === roundId && h.gameKey === gameKey);
+    if (hist) Object.assign(hist, { result, payout: i32(opts.payout), details: opts.details });
+
+    if (opts.payout > 0) this.payout(opts.payout);
+
+    const g = state.aggregate.global;
+    const per = ensureGameAgg(gameKey);
+    const entry = i32(cfg.priceTable[gameKey]?.entry ?? 0);
+
+    const apply = (agg: Aggregate, r: RoundResult) => {
+      if (r === 'win') agg.wins++;
+      if (r === 'loss') agg.losses++;
+      if (r === 'draw') agg.draws++;
+    };
+    apply(g, result);
+    apply(per, result);
+
+    if (result === 'win') {
+      g.curStreak++;
+      if (g.curStreak > g.bestStreak) g.bestStreak = g.curStreak;
+    } else if (result === 'loss') {
+      g.curStreak = 0;
+    }
+
+    if (opts.payout > 0) {
+      g.coinsWon += i32(opts.payout);
+      per.coinsWon += i32(opts.payout);
+    }
+    if (entry > 0) {
+      g.coinsLost += entry;
+      per.coinsLost += entry;
+    }
+
+    save();
+    emit('roundFinish', { gameKey, roundId, result, payout: opts.payout, balance: state.balance, details: opts.details ?? null });
+  },
+
+  defaultPayout(gameKey: GameKey, result: RoundResult) {
+    const pt = cfg.priceTable[gameKey] || {};
+    return i32(result === 'win' ? pt.win : result === 'draw' ? pt.draw : 0);
+  },
+
+  stats: {
+    get(gameKey?: GameKey): StatsSnapshot | any {
+      const enrich = (s: Aggregate) => {
+        const { games, wins, losses, draws, coinsWon, coinsLost } = s;
+        const total = games || 0;
+        const winRate = total ? Math.round(((wins || 0) / total) * 100) : 0;
+        const net = (coinsWon || 0) - (coinsLost || 0);
+        return { ...s, games: total, wins: wins || 0, losses: losses || 0, draws: draws || 0, coinsWon: coinsWon || 0, coinsLost: coinsLost || 0, winRate, net };
+      };
+      if (!gameKey) {
+        const byGame: Record<string, any> = {};
+        for (const k in state.aggregate.byGame) byGame[k] = enrich(state.aggregate.byGame[k]);
+        return { global: enrich(state.aggregate.global), byGame };
+      }
+      return enrich(ensureGameAgg(gameKey));
+    },
+  },
+
+  maybeDailyBonus(amount = 20) {
+    const today = ymd();
+    if (state.daily.lastYMD === today) {
+      return { granted: false, balance: state.balance, nextAt: new Date(new Date().setDate(new Date().getDate() + 1)) };
+    }
+    state.daily.lastYMD = today;
+    state.daily.amount = i32(amount);
+    this.payout(state.daily.amount);
+    save();
+    emit('dailyBonus', { amount: state.daily.amount, balance: state.balance, date: today });
+    return { granted: true, balance: state.balance, nextAt: new Date(new Date().setDate(new Date().getDate() + 1)) };
+  },
+
+  resetAll() {
+    state = freshState();
+    save();
+    emit('reset', { balance: state.balance });
+  },
+
+  subscribe(fn: Listener) {
+    if (typeof fn !== 'function') return () => {};
+    listeners.add(fn);
+    try {
+      fn({ type: 'init', payload: { balance: state.balance, cfg } });
+    } catch {}
+    return () => listeners.delete(fn);
+  },
+};
+
+// auto-init pĹ™i importu (stejnÄ› jako pĹŻvodnĂ­ core)
+(() => {
+  Casino.init({});
+})();
+
+===== src/games/core/GameHost.ts =====
+
+// JednotnĂ© API pro hry â€“ UI mĹŻĹľe hostovat libovolnou hru.
+export interface GameHost<TState, TAction> {
+  init: () => TState;            // inicializace ÄŤistĂ©ho stavu
+  update: (state: TState, action: TAction) => TState; // ÄŤistĂˇ logika (pure)
+  isFinished?: (state: TState) => boolean;            // volitelnĂ©
+  reset?: () => TState;          // pokud se liĹˇĂ­ od init
+}
+
+===== src/games/core/useCasino.ts =====
+
+import { useEffect, useState } from 'react';
+import { Casino } from './casino';
+import { StatsSnapshot } from './casino.types';
+
+export function useCasino() {
+  const [balance, setBalance] = useState(() => Casino.getBalance());
+  const [stats, setStats] = useState<StatsSnapshot>(() => Casino.stats.get());
+
+  useEffect(() => {
+    const unsub = Casino.subscribe((e) => {
+      if (!e?.type) return;
+      if (['init', 'balance', 'roundStart', 'roundFinish', 'dailyBonus', 'reset'].includes(e.type)) {
+        setBalance(Casino.getBalance());
+        setStats(Casino.stats.get());
+      }
+    });
+    // init refresh
+    setBalance(Casino.getBalance());
+    setStats(Casino.stats.get());
+    return unsub;
+  }, []);
+
+  return {
+    balance,
+    stats,
+    priceTable: Casino.config.priceTable,
+    startRound: Casino.startRound.bind(Casino),
+    finishRound: Casino.finishRound.bind(Casino),
+    maybeDailyBonus: Casino.maybeDailyBonus.bind(Casino),
+    defaultPayout: Casino.defaultPayout.bind(Casino),
+    canAfford: Casino.canAfford.bind(Casino),
+    resetAll: Casino.resetAll.bind(Casino),
+  };
+}
+
+===== src/widgets/CasinoHUD.tsx =====
+
+import { Card, CardContent, Stack, Chip, Button, LinearProgress, Typography, Divider, Box } from '@mui/material';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import RedeemIcon from '@mui/icons-material/Redeem';
+import InsightsIcon from '@mui/icons-material/Insights';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import { useCasino } from '@games/core/useCasino';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, useAnimate, animate } from 'framer-motion';
+import { CoinBurst } from '@shared/fx/CoinBurst';
+import { Confetti } from '@shared/fx/Confetti';
+import { usePrev } from '@shared/fx/usePrev';
+
+export function CasinoHUD() {
+  const { balance, stats, maybeDailyBonus, resetAll } = useCasino();
+  const g = stats.global;
+  const wr = Math.max(0, Math.min(100, g.winRate || 0));
+
+  const prevBalance = usePrev(balance);
+  const delta = useMemo(() => (prevBalance != null ? balance - (prevBalance as number) : 0), [balance, prevBalance]);
+
+  const [scope, animateScope] = useAnimate();
+  const [coinFx, setCoinFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const el = document.getElementById('balance-number');
+    if (!el || prevBalance == null) return;
+    const controls = animate(prevBalance as number, balance, {
+      duration: 0.6,
+      ease: 'easeOut',
+      onUpdate: (v) => { el.textContent = String(Math.round(v)); },
+    });
+    return () => { controls.stop(); };
+  }, [balance, prevBalance]);
+
+  useEffect(() => {
+    if (delta === 0) return;
+    animateScope(scope.current, { scale: [1, 1.08, 1] }, { duration: 0.35 });
+    if (delta > 0) {
+      setCoinFx(true); setConfettiFx(true);
+      const t = setTimeout(() => { setCoinFx(false); setConfettiFx(false); }, 1200);
+      return () => clearTimeout(t);
+    }
+  }, [delta, animateScope, scope]);
+
+  const handleBonus = () => {
+    const before = balance;
+    const r = maybeDailyBonus(20);
+    const gain = (r.balance ?? 0) - before;
+    setInfo(r.granted ? `đźŽ Bonus +${gain} pĹ™ipsĂˇn.` : 'Bonus uĹľ dnes vyÄŤerpĂˇn.');
+  };
+
+  return (
+    <>
+      <CoinBurst show={coinFx} />
+      <Confetti show={confettiFx} />
+      <Card variant="outlined" ref={scope}>
+        <CardContent>
+          <Stack direction="row" gap={1.25} alignItems="center" flexWrap="wrap">
+            <Chip
+              icon={<MonetizationOnIcon />}
+              label={
+                <Box component={motion.span} layout="position" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                  <span id="balance-number">{balance}</span>
+                  {delta !== 0 && (
+                    <Chip
+                      size="small"
+                      color={delta > 0 ? 'success' : 'error'}
+                      variant="filled"
+                      icon={delta > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
+                      label={(delta > 0 ? '+' : '') + delta}
+                      sx={{ ml: 0.5 }}
+                    />
+                  )}
+                </Box>
+              }
+            />
+            <Chip icon={<InsightsIcon />} variant="outlined" label={`Win rate: ${wr}%`} />
+            <Chip variant="outlined" label={`Hry: ${g.games} â€˘ VĂ˝hry: ${g.wins} â€˘ Prohry: ${g.losses} â€˘ RemĂ­zy: ${g.draws}`} />
+            <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+              <Button size="small" variant="outlined" startIcon={<RedeemIcon />} onClick={handleBonus}>
+                DennĂ­ bonus
+              </Button>
+              <Button size="small" color="error" variant="outlined" startIcon={<RestartAltIcon />} onClick={resetAll}>
+                Reset
+              </Button>
+            </Box>
+          </Stack>
+
+          <Divider sx={{ my: 1.25 }} />
+
+          <Typography variant="caption">Win rate</Typography>
+          <LinearProgress variant="determinate" value={wr} sx={{ mt: 0.5, height: 8, borderRadius: 999 }} />
+
+          {info && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {info}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+===== src/app/App.tsx =====
+
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import { RouterProvider } from 'react-router-dom';
+import { useUIStore } from '@shared/store/uiStore';
+import { buildTheme } from './theme/theme';
+import { router } from './routes';
+
+export default function App() {
+  const mode = useUIStore((s) => s.themeMode);
+  const theme = buildTheme(mode);
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  );
+}
+
+===== src/app/layout/PrimaryLayout.tsx =====
+
+import { PropsWithChildren, useState } from 'react';
+import { Outlet, Link as RouterLink } from 'react-router-dom';
+import {
+  AppBar, Toolbar, IconButton, Typography, Drawer, List, ListItemButton, ListItemText, Box, Container, CssBaseline, Divider, Link, Switch,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import { BankIndicator } from '@widgets/BankIndicator';
+
+export default function PrimaryLayout() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <CssBaseline />
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Toolbar>
+          <IconButton edge="start" onClick={() => setOpen(true)} color="inherit">
+            <MenuIcon />
+          </IconButton>
+          <SportsEsportsIcon sx={{ ml: 1, mr: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 800, flexGrow: 1 }}>
+            My Arcade
+          </Typography>
+
+          {/* đź’° Banka vpravo v AppBaru */}
+          <Box sx={{ mr: 1 }}>
+            <BankIndicator />
+          </Box>
+
+          {/* (pĹ™Ă­klad) pĹ™epĂ­naÄŤ tĂ©matu â€“ pĹ™ipoj si ke svĂ©mu theme store */}
+          <Switch disabled />
+        </Toolbar>
+      </AppBar>
+
+      <Drawer open={open} onClose={() => setOpen(false)}>
+        <Box sx={{ width: 260 }}>
+          <Typography variant="h6" sx={{ p: 2, fontWeight: 800 }}>Menu</Typography>
+          <Divider />
+          <List>
+            <ListItemButton component={RouterLink} to="/" onClick={() => setOpen(false)}>
+              <ListItemText primary="DomĹŻ" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games" onClick={() => setOpen(false)}>
+              <ListItemText primary="Hry" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/rps" onClick={() => setOpen(false)}>
+              <ListItemText primary="KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r" />
+            </ListItemButton>
+          </List>
+        </Box>
+      </Drawer>
+
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Outlet />
+      </Container>
+    </>
+  );
+}
+
+===== src/app/routes.tsx =====
+
+import { createBrowserRouter } from 'react-router-dom';
+import PrimaryLayout from '@app/layout/PrimaryLayout';
+import { HomePage } from '@pages/HomePage';
+import { GamesPage } from '@pages/GamesPage';
+import RPSGame from '@games/rps/RPS.ui';
+import { Solitaire } from '@games/solitaire';
+
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <PrimaryLayout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: 'games', element: <GamesPage /> },
+      { path: 'games/rps', element: <RPSGame /> },
+      { path: 'games/solitaire', element: <Solitaire /> },
+    ],
+  },
+]);
+
+===== src/pages/GamesPage.tsx =====
+
+import Grid from '@mui/material/Grid';
+import { Card, CardContent, Typography, Button, Chip, Stack } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+
+export function GamesPage() {
+    const navigate = useNavigate();
+
+  const games = [
+    { id: 'solitaire', title: 'Solitaire', tag: 'karetnĂ­', disabled: false, path: '/games/solitaire' },
+    { id: 'rps', title: 'KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r', tag: 'mini', disabled: false, path: '/games/rps' },
+    { id: '2048', title: '2048', tag: 'logickĂˇ', disabled: true, path: '/games/2048' },
+  ];
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h4" fontWeight={800}>Hry</Typography>
+      <Grid container spacing={2}>
+        {games.map((g) => (
+          <Grid key={g.id} size={{ xs: 12, sm: 6, md: 4 }}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack spacing={1}>
+                  <Typography variant="h6" fontWeight={700}>{g.title}</Typography>
+                  <Chip label={g.tag} size="small" />
+                  <Button variant="contained" disabled={g.disabled} onClick={() => navigate(g.path)}>
+                    HrĂˇt
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}

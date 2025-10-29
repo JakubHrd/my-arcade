@@ -4,7 +4,13 @@ import { HomePage } from '@pages/HomePage';
 import { GamesPage } from '@pages/GamesPage';
 import RPSGame from '@games/rps/RPS.ui';
 import { Solitaire } from '@games/solitaire';
+import RequireLevel from '@app/guards/RequireLevel';
+import { GAMES } from '@games/registry';
 
+const META = {
+  rps: GAMES.find(g => g.id === 'rps')!,
+  sol: GAMES.find(g => g.id === 'solitaire')!,
+};
 
 export const router = createBrowserRouter([
   {
@@ -13,8 +19,23 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'games', element: <GamesPage /> },
-      { path: 'games/rps', element: <RPSGame /> },
-      { path: 'games/solitaire', element: <Solitaire /> },
+
+      {
+        path: META.rps.path.replace('/games/', 'games/'),
+        element: (
+          <RequireLevel min={META.rps.minLevel}>
+            <RPSGame />
+          </RequireLevel>
+        ),
+      },
+      {
+        path: META.sol.path.replace('/games/', 'games/'),
+        element: (
+          <RequireLevel min={META.sol.minLevel}>
+            <Solitaire />
+          </RequireLevel>
+        ),
+      },
     ],
   },
 ]);

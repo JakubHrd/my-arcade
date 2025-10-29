@@ -1,0 +1,59 @@
+C:\Users\jacko\my-arcade
+├── eslint.config.js
+├── index.html
+├── my-arcade-27-10-2025.zip
+├── package.json
+├── pnpm-lock.yaml
+├── public
+|  └── vite.svg
+├── README.md
+├── src
+|  ├── app
+|  |  ├── App.tsx
+|  |  ├── layout
+|  |  |  └── PrimaryLayout.tsx
+|  |  ├── routes.tsx
+|  |  └── theme
+|  |     └── theme.ts
+|  ├── App.css
+|  ├── App.tsx
+|  ├── assets
+|  |  └── react.svg
+|  ├── games
+|  |  ├── core
+|  |  |  ├── casino.ts
+|  |  |  ├── casino.types.ts
+|  |  |  ├── GameHost.ts
+|  |  |  └── useCasino.ts
+|  |  ├── rps
+|  |  |  ├── RPS.logic.ts
+|  |  |  └── RPS.ui.tsx
+|  |  └── solitaire
+|  |     ├── index.ts
+|  |     ├── Solitaire.logic.ts
+|  |     └── Solitaire.ui.tsx
+|  ├── index.css
+|  ├── main.tsx
+|  ├── pages
+|  |  ├── GamesPage.tsx
+|  |  ├── HomePage.tsx
+|  |  └── NotFoundPage.tsx
+|  ├── shared
+|  |  ├── fx
+|  |  |  ├── CoinBurst.tsx
+|  |  |  ├── Confetti.tsx
+|  |  |  ├── FlyCoins.tsx
+|  |  |  └── usePrev.ts
+|  |  └── store
+|  |     └── uiStore.ts
+|  └── widgets
+|     ├── BankIndicator.tsx
+|     └── CasinoHUD.tsx
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
+
+directory: 21 file: 39 symboliclink: 29
+
+ignored: directory (1)

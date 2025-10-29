@@ -4,6 +4,10 @@ import { useUIStore } from '@shared/store/uiStore';
 import { buildTheme } from './theme/theme';
 import { router } from './routes';
 
+// 🔔 side-effect importy pro telemetrii (PR-3)
+import '@games/core/casino.telemetry';
+import '@shared/store/player.telemetry';
+
 export default function App() {
   const mode = useUIStore((s) => s.themeMode);
   const theme = buildTheme(mode);

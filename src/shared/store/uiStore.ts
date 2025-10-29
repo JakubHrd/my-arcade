@@ -1,30 +1,36 @@
 import { create } from 'zustand';
 
-type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark';
 
-interface UIState {
+type UIState = {
   themeMode: ThemeMode;
+  setThemeMode: (m: ThemeMode) => void;
   toggleTheme: () => void;
-  setTheme: (m: ThemeMode) => void;
-}
-
-const getInitialMode = (): ThemeMode => {
-  const saved = localStorage.getItem('themeMode') as ThemeMode | null;
-  if (saved) return saved;
-  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-  return prefersDark ? 'dark' : 'light';
 };
 
-export const useUIStore = create<UIState>((set) => ({
-  themeMode: getInitialMode(),
-  toggleTheme: () =>
-    set((s) => {
-      const next: ThemeMode = s.themeMode === 'light' ? 'dark' : 'light';
-      localStorage.setItem('themeMode', next);
-      return { themeMode: next };
-    }),
-  setTheme: (m) => {
-    localStorage.setItem('themeMode', m);
+const KEY = 'ui_theme_mode';
+
+const initialMode = (() => {
+  try {
+    const saved = localStorage.getItem(KEY) as ThemeMode | null;
+    if (saved === 'light' || saved === 'dark') return saved;
+    // preferuje systémové nastavení
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+})();
+
+export const useUIStore = create<UIState>()((set, get) => ({
+  themeMode: initialMode,
+  setThemeMode: (m) => {
+    try { localStorage.setItem(KEY, m); } catch {}
     set({ themeMode: m });
+  },
+  toggleTheme: () => {
+    const next = get().themeMode === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem(KEY, next); } catch {}
+    set({ themeMode: next });
   },
 }));

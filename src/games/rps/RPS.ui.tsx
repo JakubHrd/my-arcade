@@ -12,6 +12,7 @@ import { decide, icon, options, toChoice, randomChoice, RPSChoice, RPSResult } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { FlyCoins } from '@shared/fx/FlyCoins';
 import { Confetti } from '@shared/fx/Confetti';
+import { applyRPSRewards } from './RPS.rewards';
 
 export default function RPSGame() {
   const { balance, priceTable, defaultPayout, startRound, finishRound, maybeDailyBonus } = useCasino();
@@ -98,13 +99,15 @@ export default function RPSGame() {
         const payout = defaultPayout('RPS', res);
         finishRound('RPS', { roundId: roundRef.current!, result: res, payout, details: { user: choice, cpu: c } });
 
+        // 🔹 META ODMĚNY (XP + meta coins)
+        applyRPSRewards(res);
+        console.log('RPS rewards:', res);
         // overlay + efekty
         setOverlay({ open: true, type: res, payout });
 
         if (res === 'win' && payout > 0) {
           setCoinsFx(true);
           setConfettiFx(true);
-          // mince letí do banku + ping s částkou
           setTimeout(() => { setCoinsFx(false); setConfettiFx(false); }, 1100);
         }
 
@@ -122,8 +125,8 @@ export default function RPSGame() {
 
   const banner = useMemo(() => {
     if (!result) return null;
-    if (result === 'win') return { text: 'Vyhrál jsi! 🎉', color: 'success' as const };
-    if (result === 'loss') return { text: 'Prohrál jsi. 😅', color: 'error' as const };
+    if (result === 'win') return { text: 'Vyhrál jsi! 🏆', color: 'success' as const };
+    if (result === 'loss') return { text: 'Prohrál jsi. 😥', color: 'error' as const };
     return { text: 'Remíza!', color: 'default' as const };
   }, [result]);
 
@@ -204,7 +207,7 @@ export default function RPSGame() {
                     transition={{ duration: 0.28, ease: 'easeOut' }}
                     style={{ fontSize: 48, margin: '8px 0' }}
                   >
-                    {phase === 'idle' ? '❓' : icon(cpu)}
+                    {phase === 'idle' ? '…' : icon(cpu)}
                   </motion.div>
                   <Typography variant="body2" color="text.secondary">{cpu ?? '—'}</Typography>
                 </Card>

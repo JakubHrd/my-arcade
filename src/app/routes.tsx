@@ -9,8 +9,10 @@ import RequireLevel from '@app/guards/RequireLevel';
 import { GAMES } from '@games/registry';
 import { ProfilePage } from '@pages/ProfilePage';
 import { ShopPage } from '@pages/ShopPage';
-import HiloGame from '@games/hilo/Hilo.ui';
+import { Hilo } from '@games/hilo';
 import { Memory } from '@games/memory';
+import { DiceDuel } from '@games/dice';
+
 
 
 
@@ -20,6 +22,7 @@ const META = {
   rea: GAMES.find(g => g.id === 'reaction')!,
   hilo: GAMES.find(g => g.id === 'hilo')!,
   memory: GAMES.find(g => g.id === 'memory')!,
+  dice: GAMES.find(g => g.id === 'dice')!,
 };
 
 export const router = createBrowserRouter([
@@ -59,7 +62,7 @@ export const router = createBrowserRouter([
         path: META.hilo.path.replace('/games/', 'games/'),
         element: (
           <RequireLevel min={META.hilo.minLevel}>
-            <HiloGame />
+            <Hilo />
           </RequireLevel>
         ),
       },
@@ -68,6 +71,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireLevel min={META.memory.minLevel}>
             <Memory />
+          </RequireLevel>
+        ),
+      },
+      {
+        path: META.dice.path.replace('/games/', 'games/'),
+        element: (
+          <RequireLevel min={META.dice.minLevel}>
+            <DiceDuel />
           </RequireLevel>
         ),
       },

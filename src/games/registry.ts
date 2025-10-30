@@ -68,7 +68,16 @@ export const GAMES: GameMeta[] = [
   minLevel: 1,
   phase: 1,
   tag: 'Paměťová hra',
-}
+},
+{
+  id: 'dice',
+  key: 'diceDuel',                  
+  path: '/games/dice',
+  title: 'Dice Duel',
+  minLevel: 1,
+  phase: 1,
+  tag: 'kostky',
+},
   
 ];
 

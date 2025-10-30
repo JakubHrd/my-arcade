@@ -4,7 +4,7 @@ import { useUIStore } from '@shared/store/uiStore';
 import { buildTheme } from './theme/theme';
 import { router } from './routes';
 
-// 🔔 side-effect importy pro telemetrii (PR-3)
+// ✅ side-effect importy pro telemetrii
 import '@games/core/casino.telemetry';
 import '@shared/store/player.telemetry';
 

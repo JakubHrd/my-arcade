@@ -1,0 +1,94 @@
+﻿├── public
+│   └── vite.svg
+├── src
+│   ├── app
+│   │   ├── components
+│   │   │   └── CurrencyHelpDialog.tsx
+│   │   ├── dev
+│   │   │   └── TelemetryPanel.tsx
+│   │   ├── guards
+│   │   │   └── RequireLevel.tsx
+│   │   ├── layout
+│   │   │   └── PrimaryLayout.tsx
+│   │   ├── theme
+│   │   │   └── theme.ts
+│   │   ├── App.tsx
+│   │   └── routes.tsx
+│   ├── assets
+│   │   └── react.svg
+│   ├── games
+│   │   ├── core
+│   │   │   ├── casino.telemetry.ts
+│   │   │   ├── casino.ts
+│   │   │   ├── casino.types.ts
+│   │   │   ├── GameHost.ts
+│   │   │   ├── player.api.ts
+│   │   │   └── useCasino.ts
+│   │   ├── rps
+│   │   │   ├── RPS.logic.ts
+│   │   │   ├── RPS.rewards.ts
+│   │   │   └── RPS.ui.tsx
+│   │   ├── solitaire
+│   │   │   ├── index.ts
+│   │   │   ├── Solitaire.logic.ts
+│   │   │   ├── Solitaire.rewards.ts
+│   │   │   └── Solitaire.ui.tsx
+│   │   └── registry.ts
+│   ├── pages
+│   │   ├── GamesPage.tsx
+│   │   ├── HomePage.tsx
+│   │   ├── NotFoundPage.tsx
+│   │   ├── ProfilePage.tsx
+│   │   └── ShopPage.tsx
+│   ├── shared
+│   │   ├── constants
+│   │   │   ├── avatars.ts
+│   │   │   └── shop.ts
+│   │   ├── fx
+│   │   │   ├── CoinBurst.tsx
+│   │   │   ├── Confetti.tsx
+│   │   │   ├── FlyCoins.tsx
+│   │   │   ├── telemetry.ts
+│   │   │   └── usePrev.ts
+│   │   ├── store
+│   │   │   ├── player.telemetry.ts
+│   │   │   ├── playerStore.ts
+│   │   │   └── uiStore.ts
+│   │   └── types
+│   │       ├── economy.ts
+│   │       └── profile.ts
+│   ├── widgets
+│   │   ├── AvatarBadge.tsx
+│   │   ├── BankIndicator.tsx
+│   │   ├── CasinoHUD.tsx
+│   │   ├── CoinCounter.tsx
+│   │   ├── LevelChip.tsx
+│   │   ├── OnboardingDialog.tsx
+│   │   └── XPBar.tsx
+│   ├── App.css
+│   ├── App.tsx
+│   ├── env.d.ts
+│   ├── index.css
+│   └── main.tsx
+├── .env
+├── .env.development
+├── .env.production
+├── .eslintrc.cjs
+├── .gitignore
+├── .prettierrc
+├── combined.txt
+├── eslint.config.js
+├── gameCore.txt
+├── games.txt
+├── index.html
+├── my-arcade-27-10-2025.zip
+├── package.json
+├── pnpm-lock.yaml
+├── project-tree.txt
+├── README.md
+├── solitier.txt
+├── tree.txt
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts

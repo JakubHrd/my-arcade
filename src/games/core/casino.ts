@@ -18,10 +18,12 @@ const DEFAULTS: CasinoConfig = {
     RPS: { entry: 5, win: 10, draw: 3 },
     numberGuesor: { entry: 5, win: 10, draw: 0 },
     hilo: { entry: 6, win: 12, draw: 0 },
+    memory: { entry: 6, win: 12, draw: 0 },
     diceDuel: { entry: 7, win: 14, draw: 5 },
     hangman: { entry: 6, win: 18, draw: 0 },
     blackJack: { entry: 0 }, // speciál
     solitaire: { entry: 6, win: 18, draw: 0 },
+    reaction: { entry: 4, win: 9, draw: 0 },
   } as PriceTable,
 };
 

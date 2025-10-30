@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check .",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check",
+    "tree": "tree -L 10 -a -I \"node_modules|.ignored_node_modules|\\.git|dist|build|coverage|\\.vite|\\.turbo|out\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -17,7 +21,9 @@
     "@mui/icons-material": "^7.3.4",
     "@mui/lab": "7.0.1-beta.18",
     "@mui/material": "^7.3.4",
+    "@types/lodash-es": "^4.17.12",
     "framer-motion": "^12.23.24",
+    "lodash-es": "^4.17.21",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.4",

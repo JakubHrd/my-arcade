@@ -88,6 +88,21 @@ export default function PrimaryLayout() {
             <ListItemButton component={RouterLink} to="/games/solitaire" onClick={() => setOpen(false)}>
               <ListItemText primary="Solitér" />
             </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/reaction" onClick={() => setOpen(false)}>
+              <ListItemText primary="reaction" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/hilo" onClick={() => setOpen(false)}>
+              <ListItemText primary="Hi-Lo (karty)" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/memory" onClick={() => setOpen(false)}>
+              <ListItemText primary="Memory Match (Pexeso)" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/profile" onClick={() => setOpen(false)}>
+              <ListItemText primary="Účet" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/shop" onClick={() => setOpen(false)}>
+              <ListItemText primary="Shop" />
+            </ListItemButton>
           </List>
         </Box>
       </Drawer>

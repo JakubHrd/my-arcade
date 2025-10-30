@@ -1,0 +1,3910 @@
+﻿
+===== src\App.tsx =====
+
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  )
+}
+
+export default App
+
+===== src\app\App.tsx =====
+
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import { RouterProvider } from 'react-router-dom';
+import { useUIStore } from '@shared/store/uiStore';
+import { buildTheme } from './theme/theme';
+import { router } from './routes';
+
+// âś… side-effect importy pro telemetrii
+import '@games/core/casino.telemetry';
+import '@shared/store/player.telemetry';
+
+export default function App() {
+  const mode = useUIStore((s) => s.themeMode);
+  const theme = buildTheme(mode);
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  );
+}
+
+===== src\app\components\CurrencyHelpDialog.tsx =====
+
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Stack, Chip, Typography,
+} from '@mui/material';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+
+type Props = { open: boolean; onClose: () => void };
+
+export default function CurrencyHelpDialog({ open, onClose }: Props) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>NĂˇpovÄ›da: mÄ›ny & XP</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.25}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Chip icon={<MonetizationOnIcon />} color="success" variant="outlined" label="Kasino mince" size="small" />
+            <Typography variant="body2">PouĹľĂ­vĂˇĹˇ na vstupy/vĂ˝hry miniher. Spravuje <b>Casino</b>.</Typography>
+          </Stack>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Chip icon={<MonetizationOnIcon />} color="warning" variant="outlined" label="Meta mince" size="small" />
+            <Typography variant="body2">PouĹľĂ­vĂˇĹˇ v <b>Shopu</b>, odznaky a kosmetika. UloĹľeno v <b>profilu hrĂˇÄŤe</b>.</Typography>
+          </Stack>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Chip icon={<EmojiEventsIcon />} color="primary" label="XP / Level" size="small" />
+            <Typography variant="body2">XP zĂ­skĂˇvĂˇĹˇ hranĂ­m. Level odemykĂˇ novĂ© hry. DennĂ­ bonus pĹ™idĂˇ kasino mince.</Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Tip: DennĂ­ bonus najdeĹˇ v HUDu (tlaÄŤĂ­tko â€žDennĂ­ bonusâ€ś).
+          </Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">OK</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+===== src\app\dev\TelemetryPanel.tsx =====
+
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Stack, Chip, Typography, IconButton,
+  Box,
+} from '@mui/material';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import { useEffect, useState } from 'react';
+import { telemetry, TelemetryEvent } from '@shared/fx/telemetry';
+
+type Props = { open: boolean; onClose: () => void };
+
+export default function TelemetryPanel({ open, onClose }: Props) {
+  const [items, setItems] = useState<TelemetryEvent[]>(telemetry.getAll());
+
+  useEffect(() => {
+    const unsub = telemetry.subscribe((list) => setItems(list));
+    return () => { unsub(); }; // đź‘ wrap na void
+  }, []);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        Telemetry (lokĂˇlnĂ­)
+        <IconButton onClick={() => telemetry.clear()} sx={{ ml: 1 }} title="VyÄŤistit">
+          <DeleteSweepIcon />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.25}>
+          {items.length === 0 && (
+            <Typography variant="body2" color="text.secondary">Ĺ˝ĂˇdnĂ© udĂˇlosti.</Typography>
+          )}
+          {items.map((e) => (
+            <Box key={e.id} sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+              <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                <Chip
+                  size="small"
+                  color={e.kind === 'casino' ? 'success' : 'primary'}
+                  label={e.kind}
+                />
+                <Chip size="small" variant="outlined" label={e.type} />
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(e.ts).toLocaleTimeString()}
+                </Typography>
+              </Stack>
+              {e.payload != null && (
+                <Box component="pre" sx={{ m: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1, fontSize: 12, overflowX: 'auto' }}>
+                  {JSON.stringify(e.payload, null, 2)}
+                </Box>
+              )}
+            </Box>
+          ))}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">ZavĹ™Ă­t</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+===== src\app\guards\RequireLevel.tsx =====
+
+import { PropsWithChildren } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { usePlayerStore } from '@shared/store/playerStore';
+
+type Props = PropsWithChildren<{ min: number }>;
+
+export default function RequireLevel({ min, children }: Props) {
+  const level = usePlayerStore((s) => s.profile.progression.level);
+  const loc = useLocation();
+
+  if (level < min) {
+    // poĹˇli uĹľivatele zpÄ›t na katalog a vysvÄ›tli dĹŻvod
+    return (
+      <Navigate
+        to="/games"
+        replace
+        state={{ locked: true, needLevel: min, from: loc.pathname }}
+      />
+    );
+  }
+  return <>{children}</>;
+}
+
+===== src\app\layout\PrimaryLayout.tsx =====
+
+import { useState } from 'react';
+import { Outlet, Link as RouterLink } from 'react-router-dom';
+import {
+  AppBar, Toolbar, IconButton, Typography, Drawer, List, ListItemButton, ListItemText,
+  Box, Container, CssBaseline, Divider, Switch, Tooltip,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import { BankIndicator } from '@widgets/BankIndicator';
+import CoinCounter from '@widgets/CoinCounter';
+import LevelChip from '@widgets/LevelChip';
+import AvatarBadge from '@widgets/AvatarBadge';
+import CurrencyHelpDialog from '@app/components/CurrencyHelpDialog';
+import TelemetryPanel from '@app/dev/TelemetryPanel';
+import { useUIStore } from '@shared/store/uiStore';
+
+export default function PrimaryLayout() {
+  const [open, setOpen] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [telemetryOpen, setTelemetryOpen] = useState(false);
+
+  const { themeMode, toggleTheme } = useUIStore();
+
+  const telemetryEnabled =
+    import.meta.env.VITE_TELEMETRY === '1' || import.meta.env.DEV === true;
+
+  return (
+    <>
+      <CssBaseline />
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Toolbar>
+          <IconButton edge="start" onClick={() => setOpen(true)} color="inherit">
+            <MenuIcon />
+          </IconButton>
+          <SportsEsportsIcon sx={{ ml: 1, mr: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 800, flexGrow: 1 }}>
+            {import.meta.env.VITE_APP_NAME || 'My Arcade'}
+          </Typography>
+
+          {/* ---- PravĂ˝ HUD v AppBaru ---- */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.0 }}>
+            <LevelChip />
+            <CoinCounter />
+            <BankIndicator />
+            <AvatarBadge />
+
+            <Tooltip title="NĂˇpovÄ›da k mÄ›nĂˇm a XP">
+              <IconButton color="inherit" onClick={() => setHelp(true)} size="small">
+                <HelpOutlineIcon />
+              </IconButton>
+            </Tooltip>
+
+            {telemetryEnabled && (
+              <Tooltip title="Telemetry (lokĂˇlnĂ­ udĂˇlosti)">
+                <IconButton color="inherit" onClick={() => setTelemetryOpen(true)} size="small">
+                  <BugReportIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            <Tooltip title={`PĹ™epnout tĂ©ma (${themeMode === 'dark' ? 'tmavĂ©' : 'svÄ›tlĂ©'})`}>
+              <Switch
+                checked={themeMode === 'dark'}
+                onChange={toggleTheme}
+                inputProps={{ 'aria-label': 'theme switch' }}
+              />
+            </Tooltip>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      <Drawer open={open} onClose={() => setOpen(false)}>
+        <Box sx={{ width: 260 }}>
+          <Typography variant="h6" sx={{ p: 2, fontWeight: 800 }}>Menu</Typography>
+          <Divider />
+          <List>
+            <ListItemButton component={RouterLink} to="/" onClick={() => setOpen(false)}>
+              <ListItemText primary="DomĹŻ" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games" onClick={() => setOpen(false)}>
+              <ListItemText primary="Hry" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/rps" onClick={() => setOpen(false)}>
+              <ListItemText primary="KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r" />
+            </ListItemButton>
+            <ListItemButton component={RouterLink} to="/games/solitaire" onClick={() => setOpen(false)}>
+              <ListItemText primary="SolitĂ©r" />
+            </ListItemButton>
+          </List>
+        </Box>
+      </Drawer>
+
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Outlet />
+      </Container>
+
+      <CurrencyHelpDialog open={help} onClose={() => setHelp(false)} />
+      {telemetryEnabled && (
+        <TelemetryPanel open={telemetryOpen} onClose={() => setTelemetryOpen(false)} />
+      )}
+    </>
+  );
+}
+
+===== src\app\routes.tsx =====
+
+import { createBrowserRouter } from 'react-router-dom';
+import PrimaryLayout from '@app/layout/PrimaryLayout';
+import { HomePage } from '@pages/HomePage';
+import { GamesPage } from '@pages/GamesPage';
+import RPSGame from '@games/rps/RPS.ui';
+import { Solitaire } from '@games/solitaire';
+import RequireLevel from '@app/guards/RequireLevel';
+import { GAMES } from '@games/registry';
+import { ProfilePage } from '@pages/ProfilePage';
+
+const META = {
+  rps: GAMES.find(g => g.id === 'rps')!,
+  sol: GAMES.find(g => g.id === 'solitaire')!,
+};
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <PrimaryLayout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: 'games', element: <GamesPage /> },
+      { path: 'profile', element: <ProfilePage /> },
+      {
+        path: META.rps.path.replace('/games/', 'games/'),
+        element: (
+          <RequireLevel min={META.rps.minLevel}>
+            <RPSGame />
+          </RequireLevel>
+        ),
+      },
+      {
+        path: META.sol.path.replace('/games/', 'games/'),
+        element: (
+          <RequireLevel min={META.sol.minLevel}>
+            <Solitaire />
+          </RequireLevel>
+        ),
+      },
+    ],
+  },
+]);
+
+===== src\app\theme\theme.ts =====
+
+import { createTheme } from '@mui/material/styles';
+
+declare module '@mui/material/styles' {
+  interface Palette {
+    brand: {
+      main: string;
+      contrastText: string;
+    };
+  }
+  interface PaletteOptions {
+    brand?: {
+      main: string;
+      contrastText: string;
+    };
+  }
+}
+
+export const buildTheme = (mode: 'light' | 'dark') =>
+  createTheme({
+    palette: {
+      mode,
+      primary: { main: mode === 'light' ? '#6a5acd' : '#8e7dff' },
+      secondary: { main: '#00c2a8' },
+      background: {
+        default: mode === 'light' ? '#f7f7fb' : '#0f1115',
+        paper: mode === 'light' ? '#ffffff' : '#141821',
+      },
+      brand: { main: '#ff6b3d', contrastText: '#ffffff' },
+    },
+    shape: { borderRadius: 14 },
+    typography: {
+      fontFamily: `'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif`,
+      h1: { fontWeight: 800, letterSpacing: -0.5 },
+      button: { textTransform: 'none', fontWeight: 700 },
+    },
+    components: {
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: { borderRadius: 12 },
+        },
+      },
+      MuiPaper: { styleOverrides: { root: { borderRadius: 16 } } },
+    },
+  });
+
+===== src\games\core\casino.telemetry.ts =====
+
+import { Casino } from '@games/core/casino';
+import { telemetry } from '@shared/fx/telemetry';
+
+Casino.subscribe((e) => {
+  if (!e?.type) return;
+  telemetry.log({
+    kind: 'casino',
+    type: e.type,
+    payload: e.payload ?? null,
+  });
+});
+
+===== src\games\core\casino.ts =====
+
+import {
+  Aggregate,
+  CasinoConfig,
+  CasinoEvent,
+  CasinoState,
+  GameKey,
+  PriceTable,
+  RoundResult,
+  StatsSnapshot,
+} from './casino.types';
+
+type Listener = (evt: CasinoEvent) => void;
+
+const DEFAULTS: CasinoConfig = {
+  startBalance: 250,
+  storageKey: 'casino_v2_state',
+  priceTable: {
+    RPS: { entry: 5, win: 10, draw: 3 },
+    numberGuesor: { entry: 5, win: 10, draw: 0 },
+    hilo: { entry: 6, win: 12, draw: 0 },
+    diceDuel: { entry: 7, win: 14, draw: 5 },
+    hangman: { entry: 6, win: 18, draw: 0 },
+    blackJack: { entry: 0 }, // speciĂˇl
+    solitaire: { entry: 6, win: 18, draw: 0 },
+  } as PriceTable,
+};
+
+const listeners = new Set<Listener>();
+let cfg: CasinoConfig = DEFAULTS;
+let state: CasinoState;
+
+const ymd = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const i32 = (v: any, min = 0) => Math.max(min, Math.floor(Number(v) || 0));
+
+const LS = {
+  load<T>(key: string, fallback: T): T {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  save<T>(key: string, value: T) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  },
+};
+
+const baseAgg = (): Aggregate => ({
+  games: 0,
+  wins: 0,
+  losses: 0,
+  draws: 0,
+  coinsWon: 0,
+  coinsLost: 0,
+  bestStreak: 0,
+  curStreak: 0,
+});
+
+const freshState = (): CasinoState => ({
+  balance: cfg.startBalance,
+  history: [],
+  aggregate: { global: baseAgg(), byGame: {} },
+  daily: { lastYMD: null, amount: 0 },
+});
+
+const ensureGameAgg = (key: string) => {
+  const g = state.aggregate.byGame[key];
+  if (g) return g;
+  state.aggregate.byGame[key] = baseAgg();
+  return state.aggregate.byGame[key];
+};
+
+const save = () => LS.save(cfg.storageKey, state);
+const emit = (type: CasinoEvent['type'], payload?: any) => {
+  listeners.forEach((fn) => {
+    try {
+      fn({ type, payload });
+    } catch {}
+  });
+};
+
+const setBalance = (v: number) => {
+  state.balance = i32(v);
+  save();
+  emit('balance', { balance: state.balance });
+};
+
+export const Casino = {
+  init(options?: Partial<CasinoConfig>) {
+    const prevKey = options?.storageKey ?? DEFAULTS.storageKey;
+    cfg = {
+      startBalance: i32(options?.startBalance ?? DEFAULTS.startBalance),
+      storageKey: prevKey,
+      priceTable: { ...DEFAULTS.priceTable, ...(options?.priceTable ?? {}) },
+    };
+    const legacy = LS.load<CasinoState | null>('casino_v1_state', null);
+    const loaded = LS.load<CasinoState | null>(cfg.storageKey, legacy);
+    state = loaded && typeof loaded === 'object' ? { ...freshState(), ...loaded } : freshState();
+    save();
+    emit('init', { balance: state.balance, cfg });
+    return { balance: state.balance, cfg };
+  },
+
+  get config() {
+    // deep copy kvĹŻli imutabilitÄ› venku
+    return JSON.parse(JSON.stringify(cfg)) as CasinoConfig;
+  },
+
+  getBalance() {
+    return state?.balance ?? 0;
+  },
+
+  canAfford(cost: number) {
+    return state.balance >= i32(cost);
+  },
+
+  spend(cost: number) {
+    cost = i32(cost);
+    if (cost === 0) return true;
+    if (state.balance < cost) return false;
+    setBalance(state.balance - cost);
+    return true;
+  },
+
+  payout(amount: number) {
+    amount = i32(amount);
+    if (amount > 0) setBalance(state.balance + amount);
+  },
+
+  startRound(gameKey: GameKey, meta?: any) {
+    const entry = i32(cfg.priceTable[gameKey]?.entry ?? 0);
+    if (entry > 0 && !this.spend(entry)) {
+      return { ok: false as const, reason: 'INSUFFICIENT_FUNDS' as const };
+    }
+    const roundId = `${gameKey}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    state.history.push({ gameKey, roundId, ts: Date.now(), entry, result: null, payout: 0, meta: meta ?? null });
+    state.aggregate.global.games++;
+    ensureGameAgg(gameKey).games++;
+    save();
+    emit('roundStart', { gameKey, roundId, entry });
+    return { ok: true as const, roundId };
+  },
+
+  finishRound(
+    gameKey: GameKey,
+    opts: { roundId: string; result: RoundResult; payout: number; details?: any },
+  ) {
+    const { roundId, result } = opts;
+    if (!['win', 'loss', 'draw'].includes(result)) return;
+
+    const hist = state.history.find((h) => h.roundId === roundId && h.gameKey === gameKey);
+    if (hist) Object.assign(hist, { result, payout: i32(opts.payout), details: opts.details });
+
+    if (opts.payout > 0) this.payout(opts.payout);
+
+    const g = state.aggregate.global;
+    const per = ensureGameAgg(gameKey);
+    const entry = i32(cfg.priceTable[gameKey]?.entry ?? 0);
+
+    const apply = (agg: Aggregate, r: RoundResult) => {
+      if (r === 'win') agg.wins++;
+      if (r === 'loss') agg.losses++;
+      if (r === 'draw') agg.draws++;
+    };
+    apply(g, result);
+    apply(per, result);
+
+    if (result === 'win') {
+      g.curStreak++;
+      if (g.curStreak > g.bestStreak) g.bestStreak = g.curStreak;
+    } else if (result === 'loss') {
+      g.curStreak = 0;
+    }
+
+    if (opts.payout > 0) {
+      g.coinsWon += i32(opts.payout);
+      per.coinsWon += i32(opts.payout);
+    }
+    if (entry > 0) {
+      g.coinsLost += entry;
+      per.coinsLost += entry;
+    }
+
+    save();
+    emit('roundFinish', { gameKey, roundId, result, payout: opts.payout, balance: state.balance, details: opts.details ?? null });
+  },
+
+  defaultPayout(gameKey: GameKey, result: RoundResult) {
+    const pt = cfg.priceTable[gameKey] || {};
+    return i32(result === 'win' ? pt.win : result === 'draw' ? pt.draw : 0);
+  },
+
+  stats: {
+    get(gameKey?: GameKey): StatsSnapshot | any {
+      const enrich = (s: Aggregate) => {
+        const { games, wins, losses, draws, coinsWon, coinsLost } = s;
+        const total = games || 0;
+        const winRate = total ? Math.round(((wins || 0) / total) * 100) : 0;
+        const net = (coinsWon || 0) - (coinsLost || 0);
+        return { ...s, games: total, wins: wins || 0, losses: losses || 0, draws: draws || 0, coinsWon: coinsWon || 0, coinsLost: coinsLost || 0, winRate, net };
+      };
+      if (!gameKey) {
+        const byGame: Record<string, any> = {};
+        for (const k in state.aggregate.byGame) byGame[k] = enrich(state.aggregate.byGame[k]);
+        return { global: enrich(state.aggregate.global), byGame };
+      }
+      return enrich(ensureGameAgg(gameKey));
+    },
+  },
+
+  maybeDailyBonus(amount = 20) {
+    const today = ymd();
+    if (state.daily.lastYMD === today) {
+      return { granted: false, balance: state.balance, nextAt: new Date(new Date().setDate(new Date().getDate() + 1)) };
+    }
+    state.daily.lastYMD = today;
+    state.daily.amount = i32(amount);
+    this.payout(state.daily.amount);
+    save();
+    emit('dailyBonus', { amount: state.daily.amount, balance: state.balance, date: today });
+    return { granted: true, balance: state.balance, nextAt: new Date(new Date().setDate(new Date().getDate() + 1)) };
+  },
+
+  resetAll() {
+    state = freshState();
+    save();
+    emit('reset', { balance: state.balance });
+  },
+
+  subscribe(fn: Listener) {
+    if (typeof fn !== 'function') return () => {};
+    listeners.add(fn);
+    try {
+      fn({ type: 'init', payload: { balance: state.balance, cfg } });
+    } catch {}
+    return () => listeners.delete(fn);
+  },
+};
+
+// auto-init pĹ™i importu (stejnÄ› jako pĹŻvodnĂ­ core)
+(() => {
+  Casino.init({});
+})();
+
+===== src\games\core\casino.types.ts =====
+
+export type GameKey =
+  | 'RPS'
+  | 'numberGuesor'
+  | 'hilo'
+  | 'diceDuel'
+  | 'hangman'
+  | 'blackJack'
+  | 'solitaire'
+  | (string & {}); // rozĹˇiĹ™itelnĂ©
+
+export type RoundResult = 'win' | 'loss' | 'draw';
+
+export interface PriceEntry {
+  entry: number;
+  win?: number;
+  draw?: number;
+}
+
+export type PriceTable = Record<GameKey, PriceEntry>;
+
+export interface CasinoConfig {
+  startBalance: number;
+  storageKey: string;
+  priceTable: PriceTable;
+}
+
+export interface RoundHistory {
+  gameKey: GameKey;
+  roundId: string;
+  ts: number;
+  entry: number;
+  result: RoundResult | null;
+  payout: number;
+  meta?: any;
+  details?: any;
+}
+
+export interface Aggregate {
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  coinsWon: number;
+  coinsLost: number;
+  bestStreak: number;
+  curStreak: number;
+}
+
+export interface StatsSnapshot {
+  global: EnrichedAgg;
+  byGame: Record<string, EnrichedAgg>;
+}
+
+export interface EnrichedAgg extends Aggregate {
+  winRate: number;
+  net: number;
+}
+
+export interface CasinoState {
+  balance: number;
+  history: RoundHistory[];
+  aggregate: {
+    global: Aggregate;
+    byGame: Record<string, Aggregate>;
+  };
+  daily: {
+    lastYMD: string | null;
+    amount: number;
+  };
+}
+
+export type CasinoEventType =
+  | 'init'
+  | 'balance'
+  | 'roundStart'
+  | 'roundFinish'
+  | 'dailyBonus'
+  | 'reset';
+
+export interface CasinoEvent<T = any> {
+  type: CasinoEventType;
+  payload?: T;
+}
+
+===== src\games\core\GameHost.ts =====
+
+// JednotnĂ© API pro hry â€“ UI mĹŻĹľe hostovat libovolnou hru.
+export interface GameHost<TState, TAction> {
+  init: () => TState;            // inicializace ÄŤistĂ©ho stavu
+  update: (state: TState, action: TAction) => TState; // ÄŤistĂˇ logika (pure)
+  isFinished?: (state: TState) => boolean;            // volitelnĂ©
+  reset?: () => TState;          // pokud se liĹˇĂ­ od init
+}
+
+===== src\games\core\player.api.ts =====
+
+// TenkĂˇ API vrstva pro metaprogressi â€“ volĂˇ se z UI a z her.
+// CĂ­lem je udrĹľet hernĂ­ logiku ÄŤistou (GameHost) a mĂ­t jednotnĂ© volĂˇnĂ­.
+
+import { usePlayerStore,selectLevel,selectXP,selectCoins } from '@shared/store/playerStore';
+import { AvatarId, BadgeId, CosmeticId } from '@shared/types/profile';
+import { levelProgressPct } from '@shared/types/economy';
+
+export const playerApi = {
+  // --- ÄŚtenĂ­/selektory ---
+  getProfile() {
+    const s = usePlayerStore.getState();
+    return s.profile;
+  },
+  getLevel() {
+    return usePlayerStore(selectLevel);
+  },
+  getXP() {
+    return usePlayerStore(selectXP);
+  },
+  getXPProgressPct() {
+    return levelProgressPct(usePlayerStore.getState().profile.progression.xp);
+  },
+  getCoins() {
+    return usePlayerStore(selectCoins);
+  },
+  hasBadge(id: BadgeId) {
+    return usePlayerStore.getState().hasBadge(id);
+  },
+  hasCosmetic(id: CosmeticId) {
+    return usePlayerStore.getState().hasCosmetic(id);
+  },
+
+  // --- Mutace ---
+  addXP(amount: number, meta?: { reason?: string }) {
+    return usePlayerStore.getState().addXP(amount, meta);
+  },
+  addCoins(amount: number) {
+    return usePlayerStore.getState().addCoins(amount);
+  },
+  spendCoins(amount: number) {
+    return usePlayerStore.getState().spendCoins(amount);
+  },
+  setNickname(nick: string) {
+    return usePlayerStore.getState().setNickname(nick);
+  },
+  setAvatar(avatarId: AvatarId) {
+    return usePlayerStore.getState().setAvatar(avatarId);
+  },
+  grantBadge(id: BadgeId) {
+    return usePlayerStore.getState().grantBadge(id);
+  },
+  grantCosmetic(id: CosmeticId) {
+    return usePlayerStore.getState().grantCosmetic(id);
+  },
+
+  // --- Onboarding ---
+  completeOnboarding(payload: { nickname: string; avatarId: AvatarId }) {
+    return usePlayerStore.getState().completeOnboarding(payload);
+  },
+};
+
+===== src\games\core\useCasino.ts =====
+
+import { useEffect, useState } from 'react';
+import { Casino } from './casino';
+import { StatsSnapshot } from './casino.types';
+
+export function useCasino() {
+  const [balance, setBalance] = useState(() => Casino.getBalance());
+  const [stats, setStats] = useState<StatsSnapshot>(() => Casino.stats.get());
+
+  useEffect(() => {
+    const unsub = Casino.subscribe((e) => {
+      if (!e?.type) return;
+      if (['init', 'balance', 'roundStart', 'roundFinish', 'dailyBonus', 'reset'].includes(e.type)) {
+        setBalance(Casino.getBalance());
+        setStats(Casino.stats.get());
+      }
+    });
+    // init refresh
+    setBalance(Casino.getBalance());
+    setStats(Casino.stats.get());
+    return unsub;
+  }, []);
+
+  return {
+    balance,
+    stats,
+    priceTable: Casino.config.priceTable,
+    startRound: Casino.startRound.bind(Casino),
+    finishRound: Casino.finishRound.bind(Casino),
+    maybeDailyBonus: Casino.maybeDailyBonus.bind(Casino),
+    defaultPayout: Casino.defaultPayout.bind(Casino),
+    canAfford: Casino.canAfford.bind(Casino),
+    resetAll: Casino.resetAll.bind(Casino),
+  };
+}
+
+===== src\games\registry.ts =====
+
+import type { GameKey } from '@games/core/casino.types';
+
+export type GameId = 'rps' | 'solitaire' | 'reaction' | 'pexeso' | (string & {});
+
+export type GameMeta = {
+  id: GameId;
+  key: GameKey;
+  path: `/games/${string}`;
+  title: string;
+  minLevel: number; // gating
+  phase: 1 | 2 | 3;
+  tag?: string;
+  disabled?: boolean; // zobrazenĂ­ â€žBrzyâ€ś
+};
+
+export const GAMES: GameMeta[] = [
+  {
+    id: 'rps',
+    key: 'RPS',
+    path: '/games/rps',
+    title: 'KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r',
+    minLevel: 0,
+    phase: 1,
+    tag: 'mini',
+  },
+  {
+    id: 'solitaire',
+    key: 'solitaire',
+    path: '/games/solitaire',
+    title: 'SolitĂ©r (1-card)',
+    minLevel: 5, // dle plĂˇnu je v FĂˇzi 2 (L5+)
+    phase: 2,
+    tag: 'karetnĂ­',
+  },
+  // pĹ™ipravenĂ© placeholdery (nezobrazujeme tlaÄŤĂ­tko â€žHrĂˇtâ€ś)
+  {
+    id: 'reaction',
+    key: 'reaction' as GameKey,
+    path: '/games/reaction',
+    title: 'Reaction Tap',
+    minLevel: 0,
+    phase: 1,
+    tag: 'reflex',
+    disabled: true,
+  },
+  {
+    id: 'pexeso',
+    key: 'pexeso' as GameKey,
+    path: '/games/pexeso',
+    title: 'Pexeso 3Ă—4',
+    minLevel: 2,
+    phase: 1,
+    tag: 'logickĂˇ',
+    disabled: true,
+  },
+];
+
+export function getGameByPath(path: string) {
+  return GAMES.find((g) => g.path === path) ?? null;
+}
+
+export function isUnlocked(playerLevel: number, game: GameMeta): boolean {
+  return playerLevel >= (game?.minLevel ?? 0);
+}
+
+===== src\games\rps\RPS.logic.ts =====
+
+export type RPSChoice = 'kamen' | 'nuzky' | 'papir';
+export type RPSResult = 'win' | 'loss' | 'draw';
+
+export const options: RPSChoice[] = ['kamen', 'nuzky', 'papir'];
+
+export const icon = (v?: RPSChoice | null) =>
+  v === 'kamen' ? 'âśŠ' : v === 'nuzky' ? 'âśŚď¸Ź' : v === 'papir' ? 'âś‹' : 'âť“';
+
+const beats: Record<RPSChoice, RPSChoice> = {
+  kamen: 'nuzky',
+  nuzky: 'papir',
+  papir: 'kamen',
+};
+
+export const normalize = (s: string): string =>
+  (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+export const toChoice = (s: string): RPSChoice | null => {
+  const n = normalize(s);
+  if (n === 'kamen' || n === 'nuzky' || n === 'papir') return n;
+  return null;
+};
+
+export const decide = (player: RPSChoice, cpu: RPSChoice): RPSResult => {
+  if (player === cpu) return 'draw';
+  return beats[player] === cpu ? 'win' : 'loss';
+};
+
+export const randomChoice = (): RPSChoice => options[Math.floor(Math.random() * options.length)];
+
+===== src\games\rps\RPS.rewards.ts =====
+
+import { playerApi } from '@games/core/player.api';
+import type { RPSResult } from './RPS.logic';
+
+/** JednoduchĂˇ tabulka odmÄ›n pro RPS (meta, ne kasino balance). */
+export function calculateRPSRewards(result: RPSResult): { xp: number; coins: number } {
+  switch (result) {
+    case 'win':
+      return { xp: 20, coins: 8 };
+    case 'draw':
+      return { xp: 8, coins: 2 };
+    case 'loss':
+    default:
+      return { xp: 4, coins: 0 };
+  }
+}
+
+/** Aplikuje meta odmÄ›ny hrĂˇÄŤi (bez vlivu na Casino.bank). */
+export function applyRPSRewards(result: RPSResult) {
+  const { xp, coins } = calculateRPSRewards(result);
+  if (xp > 0) playerApi.addXP(xp, { reason: `RPS:${result}` });
+  if (coins > 0) playerApi.addCoins(coins);
+  console.log(`Player rewards`,{ xp, coins });
+}
+
+===== src\games\rps\RPS.ui.tsx =====
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Card, CardContent, Stack, Typography, TextField, Button, Chip, Box, Divider, ToggleButton, ToggleButtonGroup, IconButton,
+} from '@mui/material';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
+import SportsMmaIcon from '@mui/icons-material/SportsMma';
+import RedeemIcon from '@mui/icons-material/Redeem';
+import CloseIcon from '@mui/icons-material/Close';
+import { useCasino } from '@games/core/useCasino';
+import { decide, icon, options, toChoice, randomChoice, RPSChoice, RPSResult } from './RPS.logic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FlyCoins } from '@shared/fx/FlyCoins';
+import { Confetti } from '@shared/fx/Confetti';
+import { applyRPSRewards } from './RPS.rewards';
+
+export default function RPSGame() {
+  const { balance, priceTable, defaultPayout, startRound, finishRound, maybeDailyBonus } = useCasino();
+  const roundRef = useRef<string | null>(null);
+
+  const cost = priceTable.RPS?.entry ?? 5;
+  const [input, setInput] = useState<RPSChoice | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'countdown' | 'reveal' | 'finished'>('idle');
+  const [count, setCount] = useState(3);
+  const [cpu, setCpu] = useState<RPSChoice | null>(null);
+  const [result, setResult] = useState<RPSResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+
+  const [overlay, setOverlay] = useState<{ open: boolean; type: 'win' | 'loss' | 'draw'; payout: number }>({
+    open: false,
+    type: 'draw',
+    payout: 0,
+  });
+  const [coinsFx, setCoinsFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+
+  // klĂˇvesovĂ© zkratky
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'k') setInput('kamen');
+      if (k === 'n') setInput('nuzky');
+      if (k === 'p') setInput('papir');
+      if (k === 'enter') handlePlay();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, input, balance]);
+
+  const canPlay = Number.isFinite(cost) && balance >= (cost | 0);
+
+  function resetInternals(keepChoice = true) {
+    setPhase('idle');
+    if (!keepChoice) setInput(null);
+    setCpu(null);
+    setResult(null);
+    setCount(3);
+    setBusy(false);
+    roundRef.current = null;
+    setHint(null);
+  }
+
+  function smartPrepare() {
+    // pokud bylo dohrĂˇno pĹ™edchozĂ­ kolo, tady ho vnitĹ™nÄ› â€žuklidĂ­meâ€ś bez nutnosti kliknout na â€žNovĂˇ hraâ€ś
+    if (phase === 'finished') resetInternals(true);
+  }
+
+  function handlePlay() {
+    if (busy) return;
+
+    // â€žSmart Playâ€ś â€“ pokud jsem po dohranĂ©m kole, vnitĹ™nÄ› resetni a pokraÄŤuj
+    smartPrepare();
+
+    const choice = input;
+    if (!choice) { setHint('Vyber kĂˇmen / nĹŻĹľky / papĂ­r.'); return; }
+    if (!canPlay) { setHint('Nedostatek mincĂ­. Zkus DennĂ­ bonus.'); return; }
+
+    const st = startRound('RPS');
+    if (!st?.ok) { setHint('Nedostatek mincĂ­.'); return; }
+    roundRef.current = st.roundId;
+
+    setBusy(true); setHint(null); setPhase('countdown'); setCount(3);
+
+    let t = 3;
+    const id = setInterval(() => {
+      t -= 1;
+      if (t <= 0) {
+        clearInterval(id);
+
+        const c = randomChoice();
+        setCpu(c);
+
+        const res = decide(choice, c);
+        setResult(res);
+        setPhase('reveal');
+
+        const payout = defaultPayout('RPS', res);
+        finishRound('RPS', { roundId: roundRef.current!, result: res, payout, details: { user: choice, cpu: c } });
+
+        // đź”ą META ODMÄšNY (XP + meta coins)
+        applyRPSRewards(res);
+        console.log('RPS rewards:', res);
+        // overlay + efekty
+        setOverlay({ open: true, type: res, payout });
+
+        if (res === 'win' && payout > 0) {
+          setCoinsFx(true);
+          setConfettiFx(true);
+          setTimeout(() => { setCoinsFx(false); setConfettiFx(false); }, 1100);
+        }
+
+        // po krĂˇtkĂ© chvĂ­li overlay zavĹ™eme a pĹ™epneme do finished (jede Smart Play)
+        setTimeout(() => {
+          setOverlay((o) => ({ ...o, open: false }));
+          setPhase('finished');
+          setBusy(false);
+        }, 1100);
+      } else {
+        setCount(t);
+      }
+    }, 500);
+  }
+
+  const banner = useMemo(() => {
+    if (!result) return null;
+    if (result === 'win') return { text: 'VyhrĂˇl jsi! đźŹ†', color: 'success' as const };
+    if (result === 'loss') return { text: 'ProhrĂˇl jsi. đźĄ', color: 'error' as const };
+    return { text: 'RemĂ­za!', color: 'default' as const };
+  }, [result]);
+
+  return (
+    <Card variant="outlined" sx={{ overflow: 'hidden' }}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+              <Chip icon={<SportsMmaIcon />} label="KĂˇmenâ€“NĹŻĹľkyâ€“PapĂ­r" />
+              <Chip variant="outlined" label={`Cena: ${cost}`} />
+              <Chip variant="outlined" label={`ZĹŻstatek: ${balance}`} />
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Zkratky: K / N / P, Enter = HrĂˇt</Typography>
+          </Stack>
+
+          <Divider />
+
+          <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
+            {/* Vstup */}
+            <Box flex={1}>
+              <Typography variant="subtitle2" gutterBottom>Tvoje volba</Typography>
+              <ToggleButtonGroup exclusive value={input} onChange={(_, v: RPSChoice | null) => setInput(v)} size="small">
+                {options.map((o) => (
+                  <ToggleButton key={o} value={o}>
+                    <motion.span initial={false} animate={{ scale: input === o ? 1.2 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 18 }} style={{ fontSize: 22, marginRight: 6 }}>
+                      {icon(o)}
+                    </motion.span>
+                    {o}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              <TextField
+                label="nebo napiĹˇ (kĂˇmen / nĹŻĹľky / papĂ­r)" size="small" fullWidth sx={{ mt: 1 }}
+                value={input ?? ''} onChange={(e) => setInput(toChoice(e.target.value))}
+              />
+            </Box>
+
+            {/* ArĂ©na */}
+            <Box flex={1}>
+              <Typography variant="subtitle2" gutterBottom>ArĂ©na</Typography>
+              <Stack direction="row" gap={2} alignItems="stretch">
+                {/* Player */}
+                <Card variant="outlined" sx={{ flex: 1, p: 2, textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">Ty</Typography>
+                  <motion.div
+                    animate={phase === 'countdown' ? { rotate: [-4, 4, -4] } : { rotate: 0 }}
+                    transition={phase === 'countdown' ? { repeat: Infinity, duration: 0.6 } : { duration: 0.2 }}
+                    style={{ fontSize: 48, margin: '8px 0' }}
+                  >
+                    {icon(input)}
+                  </motion.div>
+                  <Typography variant="body2" color="text.secondary">{input ?? 'â€”'}</Typography>
+                </Card>
+
+                {/* VS / Countdown */}
+                <Stack alignItems="center" justifyContent="center" sx={{ minWidth: 64 }}>
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {phase === 'countdown' ? (
+                      <motion.div key="count" initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }} style={{ fontSize: 34, fontWeight: 900 }}>
+                        {count}
+                      </motion.div>
+                    ) : (
+                      <motion.div key="vs" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                        <Chip label="VS" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Stack>
+
+                {/* CPU */}
+                <Card variant="outlined" sx={{ flex: 1, p: 2, textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">PoÄŤĂ­taÄŤ</Typography>
+                  <motion.div
+                    key={phase === 'reveal' || phase === 'finished' ? 'cpu-reveal' : 'cpu-idle'}
+                    initial={{ scale: 0.9, y: -6, opacity: 0.0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ duration: 0.28, ease: 'easeOut' }}
+                    style={{ fontSize: 48, margin: '8px 0' }}
+                  >
+                    {phase === 'idle' ? 'â€¦' : icon(cpu)}
+                  </motion.div>
+                  <Typography variant="body2" color="text.secondary">{cpu ?? 'â€”'}</Typography>
+                </Card>
+              </Stack>
+
+              {/* VĂ˝sledkovĂ˝ banner */}
+              <AnimatePresence>
+                {banner && (
+                  <motion.div
+                    initial={{ y: -8, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -8, opacity: 0 }}
+                    style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}
+                  >
+                    <Chip label={banner.text} color={banner.color} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Box>
+          </Stack>
+
+          {hint && <Typography variant="body2" color="text.secondary">{hint}</Typography>}
+
+          <Stack direction="row" gap={1}>
+            {/* JedinĂ© tlaÄŤĂ­tko: vĹľdy spustĂ­ hru (Smart Play) */}
+            <Button variant="contained" onClick={handlePlay} disabled={busy || (!canPlay && phase !== 'finished')}>
+              HrĂˇt
+            </Button>
+            {!canPlay && phase !== 'finished' && (
+              <Button variant="outlined" startIcon={<RedeemIcon />} onClick={() => maybeDailyBonus(20)}>
+                DennĂ­ bonus
+              </Button>
+            )}
+            <Box flex={1} />
+            {roundRef.current && (
+              <Typography variant="caption" color="text.secondary">roundId: {roundRef.current}</Typography>
+            )}
+          </Stack>
+        </Stack>
+      </CardContent>
+
+      {/* Efekty a vĂ˝hernĂ­ overlay */}
+      <Confetti show={confettiFx} />
+      <FlyCoins show={coinsFx} toSelector="#bank-anchor" gain={overlay.payout} />
+
+      <AnimatePresence>
+        {overlay.open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }}
+            onClick={() => setOverlay((o) => ({ ...o, open: false }))}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: .9, y: 8, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: .9, y: 8, opacity: 0 }}
+              style={{ background: 'white', borderRadius: 16, padding: 24, minWidth: 280, boxShadow: '0 28px 60px rgba(0,0,0,.35)' }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="h6" fontWeight={900}>
+                  {overlay.type === 'win' ? 'VĂ˝hra!' : overlay.type === 'loss' ? 'Prohra' : 'RemĂ­za'}
+                </Typography>
+                <IconButton size="small" onClick={() => setOverlay((o) => ({ ...o, open: false }))}><CloseIcon /></IconButton>
+              </Stack>
+
+              {overlay.type === 'win' ? (
+                <Stack spacing={1.5} alignItems="center">
+                  <EmojiEventsIcon color="warning" sx={{ fontSize: 48 }} />
+                  <Typography variant="h5" fontWeight={900} color="success.main">+{overlay.payout}</Typography>
+                  <Typography variant="body2" align="center">Mince pĹ™ipsĂˇny na ĂşÄŤet. đź’°</Typography>
+                </Stack>
+              ) : overlay.type === 'loss' ? (
+                <Stack spacing={1.5} alignItems="center">
+                  <SentimentDissatisfiedIcon color="error" sx={{ fontSize: 48 }} />
+                  <Typography variant="body2" align="center">Zkus to znovu!</Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" align="center">RemĂ­za â€“ bez zmÄ›ny zĹŻstatku.</Typography>
+              )}
+
+              <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={() => setOverlay((o) => ({ ...o, open: false }))}>
+                  PokraÄŤovat
+                </Button>
+              </Stack>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
+===== src\games\solitaire\index.ts =====
+
+export { default as Solitaire } from './Solitaire.ui';
+
+===== src\games\solitaire\Solitaire.logic.ts =====
+
+export type Suit = 'â™ ' | 'â™Ą' | 'â™¦' | 'â™Ł';
+export type Rank = 'A'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9'|'10'|'J'|'Q'|'K';
+
+export type Card = {
+  id: string;
+  suit: Suit;
+  rank: Rank;
+  faceUp: boolean;
+};
+
+export type State = {
+  tableau: Card[][];
+  stock: Card[];
+  waste: Card[];
+  found: Record<Suit, Card[]>;
+  drawMode: 1 | 3;
+};
+
+export type Move =
+  | { type: 'flip'; col: number }
+  | { type: 'waste_to_found'; suit: Suit }
+  | { type: 'tab_to_found'; from: number; suit: Suit }
+  | { type: 'tab_to_tab'; from: number; index: number; to: number }
+  | { type: 'waste_to_tab'; to: number }
+  | { type: 'waste_to_tab_empty'; to: number }
+  | { type: 'recycle' }
+  | { type: 'draw'; n: number };
+
+export const SUITS: Suit[] = ['â™ ', 'â™Ą', 'â™¦', 'â™Ł'];
+export const RANKS: Rank[] = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+export const isRed = (s: Suit) => s === 'â™Ą' || s === 'â™¦';
+export const vRank = (r: Rank) =>
+  r === 'A' ? 1 : r === 'J' ? 11 : r === 'Q' ? 12 : r === 'K' ? 13 : parseInt(r, 10);
+
+export const deep = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+
+export function makeDeck(): Card[] {
+  const d: Card[] = [];
+  for (const s of SUITS) for (const r of RANKS) {
+    d.push({ id: `${r}${s}-${Math.random().toString(36).slice(2, 8)}`, suit: s, rank: r, faceUp: false });
+  }
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+export function canOnTableau(movingTop: Card | null, targetTop: Card | null): boolean {
+  if (!movingTop) return false;
+  if (!targetTop) return movingTop.rank === 'K';
+  return isRed(movingTop.suit) !== isRed(targetTop.suit) && vRank(movingTop.rank) === vRank(targetTop.rank) - 1;
+}
+
+export function canOnFound(card: Card | null, pile: Card[]): boolean {
+  if (!card) return false;
+  if (!pile.length) return card.rank === 'A';
+  const top = pile[pile.length - 1];
+  return card.suit === top.suit && vRank(card.rank) === vRank(top.rank) + 1;
+}
+
+export function isValidStack(arr: Card[]): boolean {
+  if (!arr.length || !arr[0].faceUp) return false;
+  for (let i = 0; i < arr.length - 1; i++) {
+    const a = arr[i], b = arr[i + 1];
+    if (!b.faceUp) return false;
+    if (isRed(a.suit) === isRed(b.suit)) return false;
+    if (vRank(a.rank) !== vRank(b.rank) + 1) return false;
+  }
+  return true;
+}
+
+export function deal(drawMode: 1 | 3 = 1): State {
+  const deck = makeDeck();
+  const tableau: Card[][] = Array.from({ length: 7 }, () => []);
+  let idx = 0;
+  for (let c = 0; c < 7; c++) {
+    for (let r = 0; r <= c; r++) {
+      const card = deck[idx++];
+      card.faceUp = r === c;
+      tableau[c].push(card);
+    }
+  }
+  return {
+    tableau,
+    stock: deck.slice(idx),
+    waste: [],
+    found: { 'â™ ': [], 'â™Ą': [], 'â™¦': [], 'â™Ł': [] },
+    drawMode,
+  };
+}
+
+/** Greedy solver â€“ pro Auto-win / Extreme enforcement */
+export function trySolve(initial: State) {
+  const MAX_ITERS = 1200;
+  const seen = new Set<string>();
+  const path: Move[] = [];
+
+  const key = (st: State) =>
+    JSON.stringify({
+      t: st.tableau.map((c) => c.map((k) => [k.rank, k.suit, k.faceUp])),
+      w: st.waste.map((k) => [k.rank, k.suit]),
+      s: st.stock.length,
+      f: SUITS.map((s) => st.found[s].length),
+      d: st.drawMode,
+    });
+
+  const flipIfPossible = (st: State, colIdx: number) => {
+    const col = st.tableau[colIdx];
+    if (col.length && !col[col.length - 1].faceUp) {
+      col[col.length - 1].faceUp = true;
+      path.push({ type: 'flip', col: colIdx });
+      return true;
+    }
+    return false;
+  };
+
+  const moveToFoundation = (st: State) => {
+    const topW = st.waste[st.waste.length - 1];
+    if (topW) {
+      const dest = st.found[topW.suit];
+      if (canOnFound(topW, dest)) {
+        st.waste.pop();
+        dest.push(topW);
+        path.push({ type: 'waste_to_found', suit: topW.suit });
+        return true;
+      }
+    }
+    for (let c = 0; c < 7; c++) {
+      const col = st.tableau[c];
+      if (!col.length) continue;
+      const top = col[col.length - 1];
+      if (!top.faceUp) continue;
+      const dest = st.found[top.suit];
+      if (canOnFound(top, dest)) {
+        col.pop();
+        dest.push(top);
+        path.push({ type: 'tab_to_found', from: c, suit: top.suit });
+        flipIfPossible(st, c);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const moveToTableau = (st: State) => {
+    for (let c = 0; c < 7; c++) {
+      const col = st.tableau[c];
+      for (let i = 0; i < col.length; i++) {
+        const card = col[i];
+        if (!card.faceUp) continue;
+        const stack = col.slice(i);
+        if (!isValidStack(stack)) continue;
+        for (let d = 0; d < 7; d++) {
+          if (d === c) continue;
+          const tgtTop = st.tableau[d][st.tableau[d].length - 1] || null;
+          if (canOnTableau(stack[0], tgtTop)) {
+            if (!st.tableau[d].length && stack[0].rank !== 'K') continue;
+            st.tableau[d] = st.tableau[d].concat(stack);
+            st.tableau[c] = st.tableau[c].slice(0, i);
+            path.push({ type: 'tab_to_tab', from: c, index: i, to: d });
+            flipIfPossible(st, c);
+            return true;
+          }
+        }
+      }
+    }
+    const topW = st.waste[st.waste.length - 1];
+    if (topW) {
+      for (let d = 0; d < 7; d++) {
+        const tgtTop = st.tableau[d][st.tableau[d].length - 1] || null;
+        if (canOnTableau(topW, tgtTop)) {
+          st.tableau[d].push(topW);
+          st.waste.pop();
+          path.push({ type: 'waste_to_tab', to: d });
+          return true;
+        }
+        if (!st.tableau[d].length && topW.rank === 'K') {
+          st.tableau[d].push(topW);
+          st.waste.pop();
+          path.push({ type: 'waste_to_tab_empty', to: d });
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const draw = (st: State) => {
+    if (st.stock.length === 0) {
+      if (!st.waste.length) return false;
+      st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+      st.waste = [];
+      path.push({ type: 'recycle' });
+      return true;
+    }
+    const n = Math.min(st.drawMode, st.stock.length);
+    const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+    st.stock = st.stock.slice(0, st.stock.length - n);
+    st.waste = st.waste.concat(take);
+    path.push({ type: 'draw', n });
+    return true;
+  };
+
+  const isWin = (st: State) => SUITS.every((s) => st.found[s].length === 13);
+
+  let it = 0;
+  let st = deep(initial);
+  while (it++ < MAX_ITERS) {
+    if (isWin(st)) return { ok: true as const, path };
+    const snap = key(st);
+    if (seen.has(snap)) {
+      if (!draw(st)) break;
+      continue;
+    }
+    seen.add(snap);
+
+    if (moveToFoundation(st)) continue;
+    if (moveToTableau(st)) continue;
+    if (draw(st)) continue;
+    break;
+  }
+  return { ok: false as const, path: [] as Move[] };
+}
+
+export function easeScore(initial: State, solutionPath: Move[]) {
+  const total = solutionPath.length;
+  const firstN = solutionPath.slice(0, 30);
+  const earlyFound = firstN.filter((m) => m.type === 'tab_to_found' || m.type === 'waste_to_found').length;
+  const flips = solutionPath.filter((m) => m.type === 'flip').length;
+  const recycles = solutionPath.filter((m) => m.type === 'recycle').length;
+  const initialAcesVisible = initial.tableau.reduce((acc, col) => {
+    const top = col[col.length - 1];
+    return acc + (top && top.rank === 'A' ? 1 : 0);
+  }, 0);
+  return 300 - total + 6 * earlyFound + 2 * flips + 8 * initialAcesVisible - 12 * recycles;
+}
+
+export function pickByDifficulty<T extends { score: number }>(candidates: T[], difficulty: 'easy'|'medium'|'hard'|'extreme') {
+  candidates.sort((a, b) => a.score - b.score); // low=hard, high=easy
+  const pickIndex = (() => {
+    if (difficulty === 'easy') return candidates.length - 1;
+    if (difficulty === 'medium') return Math.floor(0.8 * (candidates.length - 1));
+    if (difficulty === 'hard') return Math.floor(0.3 * (candidates.length - 1));
+    return 0; // extreme
+  })();
+  return candidates[Math.max(0, Math.min(candidates.length - 1, pickIndex))];
+}
+
+export function generateDealForDifficulty(drawMode: 1|3, difficulty: 'easy'|'medium'|'hard'|'extreme') {
+  const tries = difficulty === 'easy' ? 60 : difficulty === 'medium' ? 45 : difficulty === 'hard' ? 45 : 60;
+  const candidates: { deal: State; solution: { ok: true; path: Move[] }; score: number }[] = [];
+  for (let i = 0; i < tries; i++) {
+    const d = deal(drawMode);
+    const solved = trySolve(deep(d));
+    if (!solved.ok) continue;
+    const score = easeScore(d, solved.path);
+    candidates.push({ deal: d, solution: solved as any, score });
+  }
+  if (!candidates.length) {
+    for (let i = 0; i < 50; i++) {
+      const d = deal(drawMode);
+      const solved = trySolve(deep(d));
+      if (solved.ok) return { deal: d, solution: solved as any };
+    }
+    return null;
+  }
+  return pickByDifficulty(candidates, difficulty);
+}
+
+===== src\games\solitaire\Solitaire.rewards.ts =====
+
+import { playerApi } from '@games/core/player.api';
+
+export type SolitaireOutcome = 'win' | 'loss';
+
+/** OdmÄ›ny pro Solitaire (mĹŻĹľeĹˇ kdykoli upravit) */
+export function calculateSolitaireRewards(outcome: SolitaireOutcome, context?: { moves?: number; timeSec?: number }) {
+  if (outcome === 'win') {
+    // MĹŻĹľeĹˇ pozdÄ›ji navĂˇzat na moves/timeSec pro bonusy
+    return { xp: 40, coins: 12 };
+  }
+  return { xp: 6, coins: 0 };
+}
+
+export function applySolitaireRewards(outcome: SolitaireOutcome, context?: { moves?: number; timeSec?: number }) {
+  const { xp, coins } = calculateSolitaireRewards(outcome, context);
+  if (xp > 0) playerApi.addXP(xp, { reason: `Solitaire:${outcome}` });
+  if (coins > 0) playerApi.addCoins(coins);
+}
+
+===== src\games\solitaire\Solitaire.ui.tsx =====
+
+import { useEffect, useRef, useState } from 'react';
+import {
+  Card as MUICard,
+  CardContent,
+  Stack,
+  Typography,
+  Chip,
+  Button,
+  Box,
+  Divider,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useCasino } from '@games/core/useCasino';
+import { FlyCoins } from '@shared/fx/FlyCoins';
+import { Confetti } from '@shared/fx/Confetti';
+
+import {
+  SUITS,
+  Card as K,
+  State,
+  deal,
+  canOnTableau,
+  canOnFound,
+  isValidStack,
+  deep,
+  trySolve,
+  generateDealForDifficulty,
+  isRed,
+} from './Solitaire.logic';
+
+import { applySolitaireRewards } from './Solitaire.rewards';
+
+// ---- DND
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  useDraggable,
+  useDroppable,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  pointerWithin,
+} from '@dnd-kit/core';
+
+type Difficulty = 'easy' | 'medium' | 'hard' | 'extreme';
+
+const CARD_W = 76;
+const CARD_H = 108;
+const FAN_UP = 28;
+const FAN_DOWN = 18;
+
+/** Karta â€“ lĂ­cem nahoru */
+function CardFace({
+  c,
+  sel,
+  onDoubleClick,
+}: {
+  c: K;
+  sel?: boolean;
+  onDoubleClick?: () => void;
+}) {
+  const red = isRed(c.suit);
+  return (
+    <Box
+      onDoubleClick={onDoubleClick}
+      sx={{
+        width: CARD_W,
+        height: CARD_H,
+        borderRadius: 1.5,
+        border: sel ? '2px solid' : '1px solid',
+        borderColor: sel ? 'primary.main' : 'divider',
+        bgcolor: 'background.paper',
+        boxShadow: 1,
+        position: 'relative',
+        userSelect: 'none',
+      }}
+    >
+      {/* levĂ˝ hornĂ­ roh */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 6,
+          left: 6,
+          fontSize: 12,
+          lineHeight: 1.1,
+          textAlign: 'left',
+          color: red ? 'error.main' : 'text.primary',
+          fontWeight: 700,
+        }}
+      >
+        {c.rank}
+        <br />
+        {c.suit}
+      </Box>
+
+      {/* stĹ™ednĂ­ â€žpipâ€ś */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 20,
+          color: red ? 'error.main' : 'text.secondary',
+        }}
+      >
+        {c.rank}
+        {c.suit}
+      </Box>
+
+      {/* pravĂ˝ dolnĂ­ roh (otoÄŤenĂ˝) */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 6,
+          right: 6,
+          transform: 'rotate(180deg)',
+          fontSize: 12,
+          lineHeight: 1.1,
+          color: red ? 'error.main' : 'text.primary',
+          fontWeight: 700,
+        }}
+      >
+        {c.rank}
+        <br />
+        {c.suit}
+      </Box>
+    </Box>
+  );
+}
+
+/** Karta â€“ rub (balĂ­ÄŤek) */
+function CardDown() {
+  return (
+    <Box
+      sx={{
+        width: CARD_W,
+        height: CARD_H,
+        borderRadius: 1.5,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'grey.300',
+        backgroundImage:
+          'repeating-linear-gradient(45deg, rgba(255,255,255,.25) 0 8px, rgba(0,0,0,.04) 8px 16px)',
+        boxShadow: 1,
+      }}
+    />
+  );
+}
+
+/** PrĂˇzdnĂ© mĂ­sto pro kartu/stack */
+function EmptySlot({ label }: { label?: string }) {
+  return (
+    <Box
+      sx={{
+        width: CARD_W,
+        height: CARD_H,
+        borderRadius: 1.5,
+        border: '1px dashed',
+        borderColor: 'divider',
+        display: 'grid',
+        placeItems: 'center',
+        color: 'text.disabled',
+        fontSize: 12,
+      }}
+    >
+      {label ?? ''}
+    </Box>
+  );
+}
+
+/** DND â€“ Draggable obal pro kartu (tableau i waste-top) */
+function DraggableCard({
+  id,
+  children,
+  disabled,
+  translateY = 0,
+}: {
+  id: string;
+  children: React.ReactNode;
+  disabled?: boolean;
+  translateY?: number;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id,
+    disabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : translateY
+      ? `translateY(${translateY}px)`
+      : undefined,
+    cursor: disabled ? 'default' : 'grab',
+    zIndex: isDragging ? 5 : undefined,
+  };
+
+  return (
+    <Box ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      {children}
+    </Box>
+  );
+}
+
+/** DND â€“ Droppable pro cĂ­l (tableau column / foundation) */
+function DroppableArea({
+  id,
+  children,
+}: {
+  id: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        outline: isOver ? '2px dashed' : 'none',
+        outlineColor: 'primary.main',
+        outlineOffset: 2,
+        borderRadius: 1.5,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+export default function Solitaire() {
+  const GAME_KEY = 'solitaire' as const; // âś” sprĂˇvnĂ˝ klĂ­ÄŤ do cenĂ­ku/historie
+  const { balance, priceTable, defaultPayout, startRound, finishRound } = useCasino();
+
+  const [price, setPrice] = useState(() => priceTable?.solitaire?.entry ?? 6);
+  const [payoutWin, setPayoutWin] = useState(() => priceTable?.solitaire?.win ?? 18);
+
+  const [phase, setPhase] = useState<'idle' | 'playing' | 'auto' | 'won' | 'lost'>('idle');
+  const [drawMode, setDrawMode] = useState<1 | 3>(1);
+  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+
+  const [state, setState] = useState<State>(() => deal(drawMode));
+  const [selected, setSelected] = useState<
+    { from: 'waste' } | { from: 'tableau'; col: number; index: number } | null
+  >(null);
+  const [steps, setSteps] = useState(0);
+  const [msg, setMsg] = useState('Zvol obtĂ­Ĺľnost a klikni na NovĂˇ hra.');
+
+  const undoRef = useRef<State[]>([]);
+  const roundRef = useRef<string | null>(null);
+
+  // DND sensors
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 8 } }),
+  );
+
+  // drag state (pro DragOverlay)
+  const [dragPayload, setDragPayload] = useState<
+    | null
+    | { kind: 'waste' }
+    | { kind: 'tableau'; col: number; index: number; stack: K[] }
+  >(null);
+
+  // efekty po vĂ˝hĹ™e
+  const [overlay, setOverlay] = useState<{ open: boolean; payout: number }>({
+    open: false,
+    payout: 0,
+  });
+  const [coinsFx, setCoinsFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+
+  useEffect(() => {
+    const pt = priceTable?.solitaire;
+    if (pt?.entry != null) setPrice(pt.entry | 0);
+    if (pt?.win != null) setPayoutWin(pt.win | 0);
+  }, [priceTable]);
+
+  // detekce vĂ˝hry
+  useEffect(() => {
+    const won = SUITS.every((s) => state.found[s].length === 13);
+    if ((phase === 'playing' || phase === 'auto') && won) {
+      setPhase('won');
+      setMsg('VyhrĂˇl jsi! đźŹ†');
+      const payout = defaultPayout(GAME_KEY as any, 'win') ?? payoutWin;
+      finishRound(GAME_KEY as any, {
+        roundId: roundRef.current!,
+        result: 'win',
+        payout,
+        details: { drawMode, difficulty, steps },
+      });
+      roundRef.current = null;
+
+      // META odmÄ›ny
+      applySolitaireRewards('win', { moves: steps });
+
+      // efekty + overlay + mince do banku
+      setOverlay({ open: true, payout });
+      setCoinsFx(true);
+      setConfettiFx(true);
+      setTimeout(() => {
+        setCoinsFx(false);
+        setConfettiFx(false);
+      }, 1200);
+    }
+  }, [state, phase, drawMode, difficulty, steps, payoutWin, defaultPayout, finishRound]);
+
+  const pushUndo = () => {
+    undoRef.current.push(deep(state));
+    if (undoRef.current.length > 200) undoRef.current.shift();
+  };
+  const undo = () => {
+    if (!undoRef.current.length) return;
+    const last = undoRef.current.pop()!;
+    setState(last);
+    setSelected(null);
+    setPhase('playing');
+    setMsg('Krok zpÄ›t.');
+  };
+
+  const startGame = () => {
+    if (phase === 'playing' || phase === 'auto') return;
+    const st = startRound(GAME_KEY as any, { drawMode, difficulty });
+    if (!st?.ok) {
+      setMsg('NemĂˇĹˇ dost mincĂ­ pro start.');
+      return;
+    }
+    roundRef.current = st.roundId;
+
+    setMsg(`MĂ­chĂˇm balĂ­ÄŤek (${difficulty})â€¦`);
+    const picked = generateDealForDifficulty(drawMode, difficulty);
+    if (!picked) {
+      const d = deal(drawMode);
+      setState(d);
+      setMsg('RozdĂˇno (fallback).');
+    } else {
+      setState(picked.deal);
+      setMsg(
+        difficulty === 'easy'
+          ? 'RozdĂˇno â€“ hodnÄ› hratelnĂ˝ layout đź‘Ť'
+          : difficulty === 'medium'
+          ? 'RozdĂˇno â€“ spĂ­Ĺˇ pĹ™Ă­vÄ›tivĂ©.'
+          : difficulty === 'hard'
+          ? 'RozdĂˇno â€“ nĂˇroÄŤnÄ›jĹˇĂ­ kolo.'
+          : 'RozdĂˇno â€“ extrĂ©mnÄ› utaĹľenĂ©. Bez chyby!',
+      );
+    }
+    undoRef.current = [];
+    setSelected(null);
+    setSteps(0);
+    setPhase('playing');
+  };
+
+  const giveUp = () => {
+    if (phase !== 'playing' && phase !== 'auto') return;
+    setPhase('lost');
+    setMsg('VzdĂˇno.');
+    const payout = defaultPayout(GAME_KEY as any, 'loss') ?? 0;
+    finishRound(GAME_KEY as any, {
+      roundId: roundRef.current!,
+      result: 'loss',
+      payout,
+      details: { drawMode, difficulty },
+    });
+    roundRef.current = null;
+
+    // META odmÄ›ny (prohra)
+    applySolitaireRewards('loss');
+  };
+
+  const autoFlip = (st: State) => {
+    const cols = st.tableau.map((col) => {
+      if (!col.length) return col;
+      const top = col[col.length - 1];
+      return top.faceUp ? col : [...col.slice(0, -1), { ...top, faceUp: true }];
+    });
+    return { ...st, tableau: cols };
+  };
+
+  // === Akce ===
+  const drawFromStock = () => {
+    if (phase !== 'playing') return;
+    pushUndo();
+    const st = deep(state);
+    if (st.stock.length === 0) {
+      if (!st.waste.length) {
+        undoRef.current.pop();
+        return;
+      }
+      st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+      st.waste = [];
+      setState(st);
+      setSelected(null);
+      setMsg('Recyklace balĂ­ÄŤku.');
+      return;
+    }
+    const n = Math.min(st.drawMode, st.stock.length);
+    const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+    st.stock = st.stock.slice(0, st.stock.length - n);
+    st.waste = st.waste.concat(take);
+    setState(st);
+    setSelected(null);
+  };
+
+  const tryAutoMoveToFoundation = (from: { kind: 'waste' } | { kind: 'tableau'; col: number }) => {
+    if (phase !== 'playing') return false;
+    const st = deep(state);
+
+    if (from.kind === 'waste') {
+      const card = st.waste[st.waste.length - 1];
+      if (!card) return false;
+      const pile = st.found[card.suit];
+      if (!canOnFound(card, pile)) return false;
+      pushUndo();
+      st.waste.pop();
+      pile.push(card);
+      setState(autoFlip(st));
+      setSelected(null);
+      return true;
+    }
+    if (from.kind === 'tableau') {
+      const col = st.tableau[from.col];
+      if (!col?.length) return false;
+      const top = col[col.length - 1];
+      if (!top?.faceUp) return false;
+      const pile = st.found[top.suit];
+      if (!canOnFound(top, pile)) return false;
+      pushUndo();
+      col.pop();
+      pile.push(top);
+      setState(autoFlip(st));
+      setSelected(null);
+      return true;
+    }
+    return false;
+  };
+
+  const moveWasteToTableau = (toCol: number) => {
+    const st = deep(state);
+    const top = st.waste[st.waste.length - 1];
+    if (!top) return;
+    const target = st.tableau[toCol][st.tableau[toCol].length - 1] || null;
+    if (!canOnTableau(top, target)) return;
+    pushUndo();
+    st.waste.pop();
+    st.tableau[toCol] = [...st.tableau[toCol], top];
+    setState(autoFlip(st));
+    setSelected(null);
+  };
+
+  const moveTableauToTableau = (toCol: number, fromCol: number, fromIndex: number) => {
+    const st = deep(state);
+    const src = st.tableau[fromCol];
+    const stack = src.slice(fromIndex);
+    if (!stack.length || !isValidStack(stack)) return;
+    const target = st.tableau[toCol][st.tableau[toCol].length - 1] || null;
+    if (!canOnTableau(stack[0], target)) return;
+    if (!st.tableau[toCol].length && stack[0].rank !== 'K') return;
+    pushUndo();
+    st.tableau[fromCol] = st.tableau[fromCol].slice(0, fromIndex);
+    st.tableau[toCol] = [...st.tableau[toCol], ...stack];
+    setState(autoFlip(st));
+    setSelected(null);
+  };
+
+  const moveToFoundation = (
+    suit: K['suit'],
+    payload: { src: 'waste' } | { src: 'tableau'; col: number; index: number },
+  ) => {
+    const st = deep(state);
+    const pile = st.found[suit];
+    if (payload.src === 'waste') {
+      const card = st.waste[st.waste.length - 1];
+      if (!card || !canOnFound(card, pile)) return;
+      pushUndo();
+      st.waste.pop();
+      pile.push(card);
+      setState(autoFlip(st));
+      setSelected(null);
+      return;
+    }
+    const topIndex = st.tableau[payload.col].length - 1;
+    if (payload.index !== topIndex) return;
+    const card = st.tableau[payload.col][topIndex];
+    if (!canOnFound(card, pile)) return;
+    pushUndo();
+    st.tableau[payload.col] = st.tableau[payload.col].slice(0, topIndex);
+    pile.push(card);
+    setState(autoFlip(st));
+    setSelected(null);
+  };
+
+  // === Klik logika + double-click auto-move
+  const clickStock = () => drawFromStock();
+  const clickWaste = () => {
+    if (phase !== 'playing' || !state.waste.length) return;
+    if (selected?.from === 'waste') {
+      if (!tryAutoMoveToFoundation({ kind: 'waste' })) setSelected(null);
+      return;
+    }
+    setSelected({ from: 'waste' });
+  };
+  const clickTableau = (colIdx: number, index: number) => {
+    if (phase !== 'playing') return;
+    const card = state.tableau[colIdx][index];
+    if (!card.faceUp) {
+      if (index === state.tableau[colIdx].length - 1) {
+        pushUndo();
+        const st = deep(state);
+        st.tableau[colIdx][index] = { ...card, faceUp: true };
+        setState(st);
+      }
+      return;
+    }
+    if (
+      selected?.from === 'tableau' &&
+      selected.col === colIdx &&
+      selected.index === index &&
+      index === state.tableau[colIdx].length - 1
+    ) {
+      if (!tryAutoMoveToFoundation({ kind: 'tableau', col: colIdx })) setSelected(null);
+      return;
+    }
+    if (!selected) {
+      setSelected({ from: 'tableau', col: colIdx, index });
+      return;
+    }
+
+    const target = state.tableau[colIdx][state.tableau[colIdx].length - 1] || null;
+
+    if (selected.from === 'waste') {
+      const top = state.waste[state.waste.length - 1];
+      if (!top) return;
+      if (!canOnTableau(top, target)) {
+        setMsg('Sem to nejde.');
+        return;
+      }
+      moveWasteToTableau(colIdx);
+      return;
+    }
+    if (selected.from === 'tableau') {
+      const { col, index: srcIndex } = selected;
+      const stack = state.tableau[col].slice(srcIndex);
+      if (!isValidStack(stack) || !canOnTableau(stack[0], target)) {
+        setMsg('Sem to nejde.');
+        return;
+      }
+      if (!state.tableau[colIdx].length && stack[0].rank !== 'K') {
+        setMsg('PrĂˇzdnĂ˝ sloupec â€“ jen s krĂˇlem.');
+        return;
+      }
+      moveTableauToTableau(colIdx, col, srcIndex);
+      return;
+    }
+  };
+  const clickEmptyCol = (colIdx: number) => {
+    if (!selected) return;
+    if (selected.from === 'waste') {
+      const top = state.waste[state.waste.length - 1];
+      if (!top || top.rank !== 'K') return;
+      pushUndo();
+      const st = deep(state);
+      st.waste = st.waste.slice(0, -1);
+      st.tableau[colIdx] = [...st.tableau[colIdx], top];
+      setState(st);
+      setSelected(null);
+      return;
+    }
+    if (selected.from === 'tableau') {
+      const { col, index } = selected;
+      const stack = state.tableau[col].slice(index);
+      if (!isValidStack(stack) || stack[0].rank !== 'K') return;
+      moveTableauToTableau(colIdx, col, index);
+      return;
+    }
+  };
+
+  // === Auto-win tlaÄŤĂ­tko (upravenĂ© tickovĂˇnĂ­, provĂˇdĂ­ reĂˇlnĂ© pĹ™esuny)
+  const autoWin = () => {
+    if (phase !== 'playing') return;
+    const current = deep(state);
+    const solved = trySolve(current);
+    if (!solved.ok) {
+      setMsg('Solver to teÄŹ nedĂˇ. Zkus pĂˇr tahĹŻ a znovu Auto-win.');
+      return;
+    }
+    setMsg('Auto-win âś¨');
+    setPhase('auto');
+    setSelected(null);
+
+    let st = deep(current);
+    const path = solved.path.slice();
+
+    const apply = (mv: any) => {
+      switch (mv.type) {
+        case 'flip': {
+          const col = st.tableau[mv.col];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'waste_to_found': {
+          const card = st.waste.pop();
+          if (card) st.found[card.suit].push(card);
+          break;
+        }
+        case 'tab_to_found': {
+          const top = st.tableau[mv.from].pop();
+          if (top) st.found[top.suit].push(top);
+          const col = st.tableau[mv.from];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'tab_to_tab': {
+          const stack = st.tableau[mv.from].slice(mv.index);
+          st.tableau[mv.from] = st.tableau[mv.from].slice(0, mv.index);
+          st.tableau[mv.to] = st.tableau[mv.to].concat(stack);
+          const col = st.tableau[mv.from];
+          if (col.length && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+          break;
+        }
+        case 'waste_to_tab':
+        case 'waste_to_tab_empty': {
+          const card = st.waste.pop();
+          if (card) st.tableau[mv.to].push(card);
+          break;
+        }
+        case 'recycle': {
+          st.stock = st.waste.slice().reverse().map((c) => ({ ...c, faceUp: false }));
+          st.waste = [];
+          break;
+        }
+        case 'draw': {
+          const n = Math.min(st.drawMode, st.stock.length);
+          const take = st.stock.slice(-n).map((c) => ({ ...c, faceUp: true }));
+          st.stock = st.stock.slice(0, st.stock.length - n);
+          st.waste = st.waste.concat(take);
+          break;
+        }
+      }
+    };
+
+    const tick = () => {
+      if (!path.length) {
+        setState(st);
+        setPhase('playing'); // useEffect detekuje vĂ˝hru
+        return;
+      }
+      for (let i = 0; i < 3 && path.length; i++) apply(path.shift());
+      setState(deep(st));
+      setTimeout(tick, 90);
+    };
+    tick();
+  };
+
+  // ======== DND handlers ========
+
+  // ID schĂ©ma:
+  // - Waste top draggable: 'waste-top'
+  // - Tableau card draggable: `tab-${col}-${index}`
+  // - Droppable columns: `col-${col}`
+  // - Droppable foundations: `found-${suit}`
+  const onDragStart = (e: DragStartEvent) => {
+    const id = String(e.active.id);
+    if (id === 'waste-top') {
+      setDragPayload({ kind: 'waste' });
+      return;
+    }
+    if (id.startsWith('tab-')) {
+      const [, scol, sidx] = id.split('-');
+      const col = parseInt(scol, 10);
+      const index = parseInt(sidx, 10);
+      const colArr = state.tableau[col];
+      const stack = colArr.slice(index);
+      // pouze validnĂ­ stack je draggable (hornĂ­ karta musĂ­ bĂ˝t faceUp)
+      if (!stack.length || !stack[0].faceUp || !isValidStack(stack)) {
+        setDragPayload(null);
+        return;
+      }
+      setDragPayload({ kind: 'tableau', col, index, stack });
+    }
+  };
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    const payload = dragPayload;
+    setDragPayload(null);
+    if (!over || !payload) return;
+
+    const overId = String(over.id);
+
+    // drop na foundation
+    if (overId.startsWith('found-')) {
+      const suit = overId.replace('found-', '') as K['suit'];
+      if (payload.kind === 'waste') {
+        moveToFoundation(suit, { src: 'waste' });
+        return;
+        }
+      if (payload.kind === 'tableau') {
+        // pouze top karta mĹŻĹľe jĂ­t na foundation
+        const topIndex = state.tableau[payload.col].length - 1;
+        if (payload.index === topIndex) {
+          moveToFoundation(suit, { src: 'tableau', col: payload.col, index: payload.index });
+        }
+        return;
+      }
+    }
+
+    // drop na tableau column
+    if (overId.startsWith('col-')) {
+      const toCol = parseInt(overId.replace('col-', ''), 10);
+      if (payload.kind === 'waste') {
+        moveWasteToTableau(toCol);
+        return;
+      }
+      if (payload.kind === 'tableau') {
+        if (payload.col === toCol) return; // nic se nemÄ›nĂ­
+        moveTableauToTableau(toCol, payload.col, payload.index);
+        return;
+      }
+    }
+  };
+
+  const canStart = phase !== 'playing' && phase !== 'auto' && balance >= (price | 0);
+
+  // ===== Render =====
+  return (
+    <MUICard variant="outlined" sx={{ overflow: 'visible' }}>
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Top bar */}
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            flexWrap="wrap"
+            gap={1}
+          >
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+              <Chip label={`đź’° ${balance}`} />
+              <Chip variant="outlined" label={`Vstup: -${price} â€˘ VĂ˝hra: +${payoutWin}`} />
+              <Chip variant="outlined" label={`Kroky: ${steps}`} />
+              <Chip variant="outlined" label={`Draw: ${drawMode} â€˘ ReĹľim: ${difficulty}`} />
+            </Stack>
+          </Stack>
+
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <select
+              className="mg-select"
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+              disabled={phase === 'playing' || phase === 'auto'}
+            >
+              <option value="easy">LehkĂˇ</option>
+              <option value="medium">StĹ™ednĂ­</option>
+              <option value="hard">TÄ›ĹľkĂˇ</option>
+              <option value="extreme">ExtrĂ©mnĂ­</option>
+            </select>
+            <Button variant="contained" disabled={!canStart} onClick={startGame}>
+              NovĂˇ hra
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={undoRef.current.length === 0 || phase === 'idle'}
+              onClick={undo}
+            >
+              Undo
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={phase === 'playing' || phase === 'auto'}
+              onClick={() => setDrawMode((d) => (d === 1 ? 3 : 1))}
+            >
+              PĹ™epnout {drawMode === 1 ? 'na 3-card' : 'na 1-card'}
+            </Button>
+            <Button variant="outlined" disabled={phase !== 'playing'} onClick={autoWin}>
+              Auto-win
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={phase !== 'playing' && phase !== 'auto'}
+              onClick={giveUp}
+            >
+              VzdĂˇt
+            </Button>
+          </Stack>
+
+          <Divider />
+
+          {/* BOARD + DND */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={pointerWithin}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+          >
+            <Box sx={{ width: '100%', overflowX: 'auto' }}>
+              {/* HornĂ­ Ĺ™ada: Stock / Waste / Foundations */}
+              <Stack
+                direction="row"
+                alignItems="flex-start"
+                justifyContent="space-between"
+                sx={{ minWidth: 7 * (CARD_W + 16) }}
+              >
+                {/* Stock + Waste */}
+                <Stack direction="row" gap={2} alignItems="center">
+                  <Tooltip title="Stock (klik = dobĂ­rat / recyklovat)">
+                    <Box onClick={clickStock} sx={{ cursor: 'pointer' }}>
+                      {state.stock.length ? <CardDown /> : <EmptySlot label="PrĂˇzdnĂ©" />}
+                    </Box>
+                  </Tooltip>
+
+                  {/* Waste fan (max 3 karty viditelnĂ©) */}
+                  <Box sx={{ position: 'relative', width: CARD_W + 20, height: CARD_H }}>
+                    {state.waste.slice(-3).map((c, i, arr) => {
+                      const isTop = i === arr.length - 1;
+                      // jen top je draggable
+                      const isTopDraggable = isTop;
+                      const id = isTopDraggable ? 'waste-top' : `waste-${i}`;
+                      return (
+                        <Box
+                          key={c.id}
+                          sx={{ position: 'absolute', left: i * 10, top: 0 }}
+                          onClick={isTop ? clickWaste : undefined}
+                        >
+                          {isTopDraggable ? (
+                            <DraggableCard id={id}>
+                              <CardFace c={c} />
+                            </DraggableCard>
+                          ) : (
+                            <CardFace c={c} />
+                          )}
+                        </Box>
+                      );
+                    })}
+                    {state.waste.length === 0 && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'grid',
+                          placeItems: 'center',
+                          color: 'text.disabled',
+                          fontSize: 12,
+                        }}
+                      >
+                        Waste
+                      </Box>
+                    )}
+                  </Box>
+                </Stack>
+
+                {/* Foundations 4Ă— */}
+                <Stack direction="row" gap={2}>
+                  {SUITS.map((s) => {
+                    const pile = state.found[s];
+                    const top = pile[pile.length - 1] || null;
+                    const dropId = `found-${s}`;
+                    return (
+                      <DroppableArea key={s} id={dropId}>
+                        <Box
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            if (!selected) return;
+                            if (selected.from === 'waste') return moveToFoundation(s, { src: 'waste' });
+                            if (selected.from === 'tableau')
+                              return moveToFoundation(s, {
+                                src: 'tableau',
+                                col: selected.col,
+                                index: selected.index,
+                              });
+                          }}
+                        >
+                          {top ? <CardFace c={top} /> : <EmptySlot label={s} />}
+                        </Box>
+                      </DroppableArea>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+
+              {/* Tableau â€“ 7 sloupcĹŻ */}
+              <Box
+                sx={{
+                  mt: 3,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(7, ${CARD_W}px)`,
+                  gap: 2,
+                  minWidth: 7 * (CARD_W + 16),
+                  pb: 2,
+                }}
+              >
+                {state.tableau.map((col, ci) => {
+                  const height =
+                    col.reduce((h, c) => h + (c.faceUp ? FAN_UP : FAN_DOWN), 0) + CARD_H + 8;
+                  const dropId = `col-${ci}`;
+                  return (
+                    <DroppableArea key={ci} id={dropId}>
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          width: CARD_W,
+                          minHeight: Math.max(height, CARD_H + 40),
+                          borderRadius: 1,
+                          background:
+                            'repeating-linear-gradient(0deg, rgba(0,0,0,0.02) 0 12px, rgba(0,0,0,0.04) 12px 24px)',
+                        }}
+                        onClick={() => {
+                          if (!col.length) clickEmptyCol(ci);
+                        }}
+                      >
+                        {/* placeholder text */}
+                        {col.length === 0 && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 8,
+                              left: 0,
+                              right: 0,
+                              display: 'grid',
+                              placeItems: 'center',
+                              color: 'text.disabled',
+                              pointerEvents: 'none',
+                              fontSize: 12,
+                            }}
+                          >
+                            PrĂˇzdnĂ©
+                          </Box>
+                        )}
+
+                        {col.map((c, idx) => {
+                          const y = col
+                            .slice(0, idx)
+                            .reduce((p, cc) => p + (cc.faceUp ? FAN_UP : FAN_DOWN), 0);
+                          const isTop = idx === col.length - 1;
+                          const stack = col.slice(idx);
+                          const stackDraggable =
+                            c.faceUp && isValidStack(stack); // jen validnĂ­ faceUp stack
+                          const dragId = `tab-${ci}-${idx}`;
+
+                          return (
+                            <Box
+                              key={c.id}
+                              onClick={() => {
+                                // klik logika paralelnÄ› s DnD
+                                // (vĂ˝bÄ›r + pĹ™Ă­padnĂ˝ auto-move)
+                                const card = state.tableau[ci][idx];
+                                if (!card.faceUp) {
+                                  if (idx === state.tableau[ci].length - 1) {
+                                    const st = deep(state);
+                                    st.tableau[ci][idx] = { ...card, faceUp: true };
+                                    setState(st);
+                                  }
+                                  return;
+                                }
+                                if (selected?.from === 'tableau' && selected.col === ci && selected.index === idx && isTop) {
+                                  if (!tryAutoMoveToFoundation({ kind: 'tableau', col: ci })) setSelected(null);
+                                  return;
+                                }
+                                setSelected({ from: 'tableau', col: ci, index: idx });
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                top: 8 + y,
+                                left: 0,
+                                cursor: stackDraggable ? 'grab' : 'pointer',
+                              }}
+                            >
+                              {c.faceUp ? (
+                                stackDraggable ? (
+                                  <DraggableCard id={dragId}>
+                                    <CardFace c={c} sel={selected?.from === 'tableau' && selected.col === ci && selected.index === idx} />
+                                  </DraggableCard>
+                                ) : (
+                                  <CardFace c={c} sel={selected?.from === 'tableau' && selected.col === ci && selected.index === idx} />
+                                )
+                              ) : (
+                                <CardDown />
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </DroppableArea>
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {/* Drag overlay â€“ zobrazenĂ­ pĹ™etahovanĂ©ho stacku/karty */}
+            <DragOverlay dropAnimation={null}>
+              {dragPayload ? (
+                dragPayload.kind === 'waste' ? (
+                  state.waste.length ? <CardFace c={state.waste[state.waste.length - 1]} /> : null
+                ) : (
+                  <Box sx={{ position: 'relative' }}>
+                    {dragPayload.stack.map((c, i) => (
+                      <Box key={c.id} sx={{ position: 'absolute', top: i * FAN_UP, left: 0 }}>
+                        <CardFace c={c} />
+                      </Box>
+                    ))}
+                    <Box sx={{ width: CARD_W, height: CARD_H + (dragPayload.stack.length - 1) * FAN_UP }} />
+                  </Box>
+                )
+              ) : null}
+            </DragOverlay>
+
+          </DndContext>
+
+          {/* status */}
+          {msg && (
+            <Box sx={{ mt: 1 }}>
+              <Chip
+                size="small"
+                color={phase === 'won' ? 'success' : phase === 'lost' ? 'error' : 'default'}
+                label={msg}
+              />
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+
+      {/* Efekty */}
+      <Confetti show={confettiFx} />
+      <FlyCoins show={coinsFx} toSelector="#bank-anchor" gain={overlay.payout} />
+
+      {/* Overlay po vĂ˝hĹ™e */}
+      <AnimatePresence>
+        {overlay.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1500,
+            }}
+            onClick={() => setOverlay({ ...overlay, open: false })}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.96, y: 8, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.96, y: 8, opacity: 0 }}
+              style={{
+                background: 'white',
+                borderRadius: 16,
+                padding: 24,
+                minWidth: 280,
+                boxShadow: '0 28px 60px rgba(0,0,0,.35)',
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1 }}
+              >
+                <Typography variant="h6" fontWeight={900}>
+                  VĂ˝hra!
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => setOverlay({ ...overlay, open: false })}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+              <Typography variant="h5" fontWeight={900} color="success.main" align="center">
+                +{overlay.payout}
+              </Typography>
+              <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                Mince pĹ™ipsĂˇny na ĂşÄŤet. đź’°
+              </Typography>
+              <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => setOverlay({ ...overlay, open: false })}
+                >
+                  PokraÄŤovat
+                </Button>
+              </Stack>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </MUICard>
+  );
+}
+
+===== src\main.tsx =====
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './app/App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+===== src\pages\GamesPage.tsx =====
+
+import Grid from '@mui/material/Grid';
+import { Card, CardContent, Typography, Button, Chip, Stack, Box, Tooltip, Alert } from '@mui/material';
+import LockIcon from '@mui/icons-material/Lock';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { GAMES, isUnlocked } from '@games/registry';
+import { usePlayerStore } from '@shared/store/playerStore';
+
+export function GamesPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const level = usePlayerStore((s) => s.profile.progression.level);
+
+  const lockedRedirect = location.state?.locked as boolean | undefined;
+  const needLevel = location.state?.needLevel as number | undefined;
+  const from = location.state?.from as string | undefined;
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h4" fontWeight={800}>Hry</Typography>
+
+      {lockedRedirect && typeof needLevel === 'number' && (
+        <Alert
+          severity="info"
+          onClose={() => window.history.replaceState({}, document.title)}
+        >
+          PĹ™Ă­stup do <strong>{from}</strong> je uzamÄŤen. Odemkne se na <strong>Level {needLevel}+</strong>.
+        </Alert>
+      )}
+
+      <Grid container spacing={2}>
+        {GAMES.map((g) => {
+          const unlocked = isUnlocked(level, g);
+          return (
+            <Grid key={g.id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent>
+                  <Stack spacing={1}>
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <SportsEsportsIcon fontSize="small" />
+                      <Typography variant="h6" fontWeight={700}>{g.title}</Typography>
+                    </Stack>
+
+                    <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                      <Chip label={`L${g.minLevel}+`} size="small" variant="outlined" />
+                      {g.tag && <Chip label={g.tag} size="small" />}
+                      {g.phase && <Chip label={`FĂˇze ${g.phase}`} size="small" variant="outlined" />}
+                    </Stack>
+
+                    <Box sx={{ mt: 1 }}>
+                      {g.disabled ? (
+                        <Chip icon={<LockIcon />} label="Brzy" size="small" />
+                      ) : unlocked ? (
+                        <Button
+                          variant="contained"
+                          onClick={() => navigate(g.path)}
+                        >
+                          HrĂˇt
+                        </Button>
+                      ) : (
+                        <Tooltip title={`Odemkne se na Lv ${g.minLevel}+`}>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              startIcon={<LockIcon />}
+                              disabled
+                            >
+                              UzamÄŤeno
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+    </Stack>
+  );
+}
+
+===== src\pages\HomePage.tsx =====
+
+import { Card, CardContent, Typography, Button, Stack } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { CasinoHUD } from '@widgets/CasinoHUD';
+
+
+export function HomePage() {
+  const navigate = useNavigate();
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h4" fontWeight={800}>VĂ­tej v hernÄ›</Typography>
+      <Card>
+        <CardContent>
+          <Typography sx={{ mb: 2 }}>
+            ZaÄŤni hned â€“ mrkni na dostupnĂ© mini hry nebo si pĹ™iprav profil.
+          </Typography>
+          <CasinoHUD />
+          <Button variant="contained" color="primary" onClick={() => navigate('/games')}>
+            Zobrazit hry
+          </Button>
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+}
+
+===== src\pages\NotFoundPage.tsx =====
+
+import { Box, Typography } from '@mui/material';
+export function NotFoundPage() {
+  return (
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h5" fontWeight={800}>404 â€“ Nenalezeno</Typography>
+      <Typography>Ups, tahle obrazovka neexistuje.</Typography>
+    </Box>
+  );
+}
+
+===== src\pages\ProfilePage.tsx =====
+
+import { Avatar, Stack, Typography, Divider, Box, Chip, Button } from '@mui/material';
+import { usePlayerStore } from '@shared/store/playerStore';
+import { XPBar } from '@widgets/XPBar';
+import CoinCounter from '@widgets/CoinCounter';
+import LevelChip from '@widgets/LevelChip';
+import { DEFAULT_AVATARS } from '@shared/constants/avatars';
+
+export function ProfilePage() {
+  const profile = usePlayerStore((s) => s.profile);
+  const avatar = DEFAULT_AVATARS.find((a) => a.id === profile.equipped.avatarId);
+    console.log(profile);
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h4" fontWeight={800}>TvĹŻj profil</Typography>
+      <Divider />
+
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Avatar src={avatar?.url} sx={{ width: 80, height: 80 }} />
+        <Stack>
+          <Typography variant="h6">{profile.nickname || 'NeznĂˇmĂ˝ hrĂˇÄŤ'}</Typography>
+          <LevelChip />
+          <CoinCounter />
+        </Stack>
+      </Stack>
+
+      <Box>
+        <XPBar />
+      </Box>
+
+      <Divider />
+
+      <Typography variant="h6">Odznaky ({Object.keys(profile.badges).length})</Typography>
+      {Object.keys(profile.badges).length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          ZatĂ­m ĹľĂˇdnĂ© odznaky.
+        </Typography>
+      ) : (
+        <Stack direction="row" flexWrap="wrap" gap={1}>
+          {Object.keys(profile.badges).map((id) => (
+            <Chip key={id} label={id} color="secondary" />
+          ))}
+        </Stack>
+      )}
+
+      <Divider />
+
+      <Button variant="outlined" color="error" onClick={() => usePlayerStore.getState().resetProfile()}>
+        Reset profilu
+      </Button>
+    </Stack>
+  );
+}
+
+===== src\pages\ShopPage.tsx =====
+
+import { Stack, Typography, Divider, Card, CardContent, Button } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { usePlayerStore,selectCoins } from '@shared/store/playerStore';
+import { playerApi } from '@games/core/player.api';
+import { SHOP_ITEMS } from '@shared/constants/shop';
+
+export function ShopPage() {
+  const coins = usePlayerStore(selectCoins);
+
+  const handleBuy = (id: string, price: number) => {
+    if (playerApi.hasCosmetic(id as any)) return;
+    if (!playerApi.spendCoins(price)) {
+      alert('Nedostatek mincĂ­!');
+      return;
+    }
+    playerApi.grantCosmetic(id as any);
+    alert('Zakoupeno!');
+  };
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h4" fontWeight={800}>Shop</Typography>
+      <Typography variant="body2" color="text.secondary">
+        MĂˇĹˇ {coins} mincĂ­.
+      </Typography>
+      <Divider />
+
+      <Grid container spacing={2}>
+        {SHOP_ITEMS.map((item) => (
+          <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6">{item.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{item.desc}</Typography>
+                <Typography variant="body2" sx={{ my: 1 }}>
+                  Cena: {item.price} đź’°
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => handleBuy(item.id, item.price)}
+                  disabled={playerApi.hasCosmetic(item.id as any)}
+                >
+                  {playerApi.hasCosmetic(item.id as any) ? 'Zakoupeno' : 'Koupit'}
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+===== src\shared\constants\avatars.ts =====
+
+// VĂ˝chozĂ­ kolekce avatarĹŻ pro onboarding
+
+export interface AvatarDef {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export const DEFAULT_AVATARS: AvatarDef[] = [
+  { id: 'cat', name: 'KoÄŤka', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
+  { id: 'dog', name: 'Pes', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
+  { id: 'robot', name: 'Robot', url: 'https://cdn-icons-png.flaticon.com/512/4712/4712104.png' },
+  { id: 'ghost', name: 'Duch', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
+  { id: 'ninja', name: 'Ninja', url: 'https://cdn-icons-png.flaticon.com/512/4712/4712135.png' },
+];
+
+===== src\shared\constants\shop.ts =====
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  desc: string;
+  price: number;
+}
+
+export const SHOP_ITEMS: ShopItem[] = [
+  { id: 'frame_gold', name: 'ZlatĂ˝ rĂˇm avataru', desc: 'PrĂ©miovĂ˝ zlatĂ˝ rĂˇmeÄŤek', price: 120 },
+  { id: 'frame_silver', name: 'StĹ™Ă­brnĂ˝ rĂˇm avataru', desc: 'ElegantnĂ­ stĹ™Ă­brnĂ˝ rĂˇmeÄŤek', price: 60 },
+  { id: 'fx_confetti', name: 'Efekt: Konfety', desc: 'Animace pĹ™i vĂ˝hĹ™e', price: 80 },
+];
+
+===== src\shared\fx\CoinBurst.tsx =====
+
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import PaidRoundedIcon from '@mui/icons-material/PaidRounded';
+
+export function CoinBurst({ show, onDone }: { show: boolean; onDone?: () => void }) {
+  const [items, setItems] = useState<number[]>([]);
+  useEffect(() => {
+    if (show) {
+      setItems(Array.from({ length: 14 }, (_, i) => i));
+      const t = setTimeout(() => onDone?.(), 900);
+      return () => clearTimeout(t);
+    } else setItems([]);
+  }, [show, onDone]);
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1300 }}>
+          {items.map((i) => {
+            const dx = (Math.random() * 2 - 1) * 260;
+            const dy = -120 - Math.random() * 180;
+            const rot = (Math.random() * 360 - 180) | 0;
+            const delay = Math.random() * 0.12;
+            return (
+              <motion.span
+                key={i}
+                initial={{ x: '50vw', y: '60vh', scale: 0.6, opacity: 0 }}
+                animate={{ x: `calc(50vw + ${dx}px)`, y: `calc(60vh + ${dy}px)`, rotate: rot, scale: 1, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8, ease: 'easeOut', delay }}
+                style={{ position: 'absolute' }}
+              >
+                <PaidRoundedIcon sx={{ color: '#E6B800', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,.25))' }} />
+              </motion.span>
+            );
+          })}
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export default CoinBurst;
+
+===== src\shared\fx\Confetti.tsx =====
+
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+type ConfettiProps = { show: boolean; count?: number; onDone?: () => void };
+
+export function Confetti({ show, count = 60, onDone }: ConfettiProps) {
+  const [items, setItems] = useState<number[]>([]);
+  useEffect(() => {
+    if (show) {
+      setItems(Array.from({ length: count }, (_, i) => i));
+      const t = setTimeout(() => onDone?.(), 1200);
+      return () => clearTimeout(t);
+    } else {
+      setItems([]);
+    }
+  }, [show, count, onDone]);
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1300 }}>
+          {items.map((i) => {
+            const x = Math.random() * 100;
+            const r = (Math.random() * 720 - 360) | 0;
+            const d = 0.8 + Math.random() * 0.6;
+            const s = 6 + Math.random() * 10;
+            const hue = (Math.random() * 360) | 0;
+            return (
+              <motion.span
+                key={i}
+                initial={{ x: `${x}vw`, y: '-5vh', rotate: 0, opacity: 0 }}
+                animate={{ y: '110vh', rotate: r, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: d, ease: 'easeOut' }}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  width: s,
+                  height: s * 0.6,
+                  background: `hsl(${hue} 90% 55%)`,
+                  borderRadius: 2,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export default Confetti;
+
+===== src\shared\fx\FlyCoins.tsx =====
+
+import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import PaidRoundedIcon from '@mui/icons-material/PaidRounded';
+
+type Props = {
+  show: boolean;
+  toSelector: string;          // napĹ™. "#bank-anchor"
+  count?: number;
+  from?: { x?: number; y?: number }; // start v px; default ~stĹ™ed okna
+  gain?: number;               // kolik se pĹ™ipsalo (pro bank-ping)
+  onDone?: () => void;
+};
+
+function targetCenter(sel: string) {
+  const el = document.querySelector(sel) as HTMLElement | null;
+  if (!el) return { x: window.innerWidth - 40, y: 20 };
+  const r = el.getBoundingClientRect(); // viewport coords (pro position:fixed)
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+export function FlyCoins({ show, toSelector, count = 12, from, gain, onDone }: Props) {
+  const [items, setItems] = useState<number[]>([]);
+  const start = useMemo(
+    () => ({ x: from?.x ?? window.innerWidth * 0.5, y: from?.y ?? window.innerHeight * 0.6 }),
+    [from]
+  );
+  const dest = useMemo(() => targetCenter(toSelector), [toSelector]);
+
+  useEffect(() => {
+    if (!show) { setItems([]); return; }
+    setItems(Array.from({ length: count }, (_, i) => i));
+
+    // po doletu pingneme banku
+    const t = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('bank-ping', { detail: { gain: gain ?? 0 } }));
+      onDone?.();
+    }, 950);
+    return () => clearTimeout(t);
+  }, [show, count, gain, onDone]);
+
+  return createPortal(
+    <AnimatePresence>
+      {show && items.map((i) => {
+        // nĂˇhodnĂ˝ â€žmezi-bodâ€ś: trochu doprava/doleva a HLAVNÄš NAHORU
+        const midX = start.x + (Math.random() * 2 - 1) * 180;
+        const midY = Math.min(start.y - (120 + Math.random() * 180), dest.y + 20); // posuĹ vĂ˝raznÄ› nahoru
+
+        const delay = Math.random() * 0.10;
+        const rot = (Math.random() * 360 - 180) | 0;
+
+        return (
+          <motion.div
+            key={i}
+            initial={{ x: start.x, y: start.y, scale: 0.7, opacity: 0, rotate: 0 }}
+            animate={{
+              x: [start.x, midX, dest.x],
+              y: [start.y, midY, dest.y],
+              scale: [0.7, 0.9, 0.85],
+              opacity: [0, 1, 1],
+              rotate: [0, rot, rot * 0.3],
+            }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: 0.9,
+              ease: 'easeInOut',
+              times: [0, 0.45, 1],
+              delay,
+            }}
+            style={{ position: 'fixed', zIndex: 1600, pointerEvents: 'none', willChange: 'transform' }}
+          >
+            <PaidRoundedIcon sx={{ color: '#E6B800', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,.25))' }} />
+          </motion.div>
+        );
+      })}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+===== src\shared\fx\telemetry.ts =====
+
+type TelemetryEventBase = {
+  id: string;
+  ts: number;
+  kind: 'casino' | 'profile';
+  type: string;
+  payload?: any;
+};
+
+export type TelemetryEvent = TelemetryEventBase;
+
+const KEY = 'telemetry_v1';
+const LIMIT = 200;
+
+function load(): TelemetryEvent[] {
+  try {
+    const raw = localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as TelemetryEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function save(arr: TelemetryEvent[]) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(arr.slice(-LIMIT)));
+  } catch {}
+}
+
+let cache: TelemetryEvent[] = load();
+const subs = new Set<(list: TelemetryEvent[]) => void>();
+
+function emit() {
+  subs.forEach((fn) => {
+    try { fn(cache); } catch {}
+  });
+}
+
+export const telemetry = {
+  log(evt: Omit<TelemetryEvent, 'id' | 'ts'>) {
+    const full: TelemetryEvent = {
+      ...evt,
+      id: Math.random().toString(36).slice(2, 10),
+      ts: Date.now(),
+    };
+    cache.push(full);
+    if (cache.length > LIMIT) cache = cache.slice(-LIMIT);
+    save(cache);
+    emit();
+  },
+  getAll(): TelemetryEvent[] {
+    return [...cache].reverse();
+  },
+  clear() {
+    cache = [];
+    save(cache);
+    emit();
+  },
+  subscribe(fn: (list: TelemetryEvent[]) => void): () => void {
+    subs.add(fn);
+    try { fn(this.getAll()); } catch {}
+    return () => {
+      // đź‘‡ explicitnÄ› void cleanup
+      subs.delete(fn);
+    };
+  },
+};
+
+===== src\shared\fx\usePrev.ts =====
+
+import { useRef } from 'react';
+export function usePrev<T>(v: T) {
+  const r = useRef<T>(v);
+  const prev = r.current;
+  r.current = v;
+  return prev;
+}
+
+===== src\shared\store\player.telemetry.ts =====
+
+// src/shared/store/player.telemetry.ts
+import { usePlayerStore } from './playerStore';
+import type { PlayerState } from './playerStore';
+
+// --- helper pro identitu
+function buildIdentity() {
+  const p = usePlayerStore.getState().profile;
+  const id = p.nickname?.trim() ? p.nickname.trim() : p.id;
+  return {
+    id,
+    traits: {
+      level: p.progression.level,
+      xp: p.progression.xp,
+      avatar: p.equipped.avatarId ?? 'none',
+      onboardingDone: p.onboardingDone === true,
+      coins: p.coins,
+      createdAt: p.createdAt,
+    },
+  };
+}
+
+// --- identifikace pouze pokud je hotovĂ˝ onboarding
+function identifyIfReady() {
+  const p = usePlayerStore.getState().profile;
+  if (!p.onboardingDone) return;
+  const { id, traits } = buildIdentity();
+
+  // TODO: sem napoj reĂˇlnĂ© SDK (Segment/PostHog/Amplitudeâ€¦)
+  // telemetry.identify(id, traits);
+  console.debug('[telemetry] identify', id, traits);
+}
+
+// 1) pokus o okamĹľitou identifikaci (uĹľivatel mohl bĂ˝t hydratovanĂ˝ a onboarding hotovĂ˝)
+try {
+  identifyIfReady();
+} catch {}
+
+// 2) poslouchĂˇme zmÄ›ny profilu; v zustand v5 mĂˇ subscribe signaturu (state, prevState)
+let prev = usePlayerStore.getState();
+const unsubscribe = usePlayerStore.subscribe((state: PlayerState, prevState: PlayerState) => {
+  const before = prevState.profile;
+  const after = state.profile;
+
+  // spustit identify, kdyĹľ:
+  // a) onboarding pĹ™ejde z false -> true
+  // b) onboarding je hotovĂ˝ a zmÄ›nĂ­ se nickname nebo avatar
+  const onboardingBecameTrue = before.onboardingDone === false && after.onboardingDone === true;
+  const nicknameChanged = after.onboardingDone && before.nickname !== after.nickname;
+  const avatarChanged = after.onboardingDone && before.equipped.avatarId !== after.equipped.avatarId;
+
+  if (onboardingBecameTrue || nicknameChanged || avatarChanged) {
+    try {
+      identifyIfReady();
+    } catch {}
+  }
+
+  prev = state;
+});
+
+// VolitelnÄ›: pĹ™idĂˇme cleanup pro snadnĂ© odpojenĂ­ v dev tools
+// (window as any).__playerTelemetryCleanup = () => unsubscribe();
+
+===== src\shared\store\playerStore.ts =====
+
+// Zustand store s persistencĂ­ pro profil hrĂˇÄŤe (metaâ€“progrese).
+
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { createDefaultProfile, PlayerProfile, BadgeId, CosmeticId, AvatarId } from '@shared/types/profile';
+import { ECONOMY_CONSTANTS, levelFromXP } from '@shared/types/economy';
+
+type PlayerStoreVersion = 1;
+
+export interface PlayerState {
+  version: PlayerStoreVersion;
+  profile: PlayerProfile;
+
+  // --- Akce
+  setNickname(nick: string): void;
+  setAvatar(avatarId: AvatarId): void;
+
+  addXP(amount: number, meta?: { reason?: string }): { newXP: number; newLevel: number; leveledUp: boolean };
+  addCoins(amount: number): number;
+  spendCoins(amount: number): boolean;
+
+  grantBadge(id: BadgeId): void;
+  hasBadge(id: BadgeId): boolean;
+
+  grantCosmetic(id: CosmeticId): void;
+  hasCosmetic(id: CosmeticId): boolean;
+
+  completeOnboarding(payload: { nickname: string; avatarId: AvatarId }): void;
+
+  // ĂšdrĹľba
+  resetProfile(): void;
+}
+
+const STORAGE_KEY = 'player_v1';
+
+export const usePlayerStore = create<PlayerState>()(
+  persist(
+    (set, get) => ({
+      version: 1 as PlayerStoreVersion,
+      profile: createDefaultProfile(),
+
+      setNickname(nickname) {
+        set((s) => ({ profile: { ...s.profile, nickname } }));
+      },
+
+      setAvatar(avatarId) {
+        set((s) => ({ profile: { ...s.profile, equipped: { ...s.profile.equipped, avatarId } } }));
+      },
+
+      addXP(amount, _meta) {
+        const safe = Math.max(0, Math.floor(amount || 0));
+        if (safe <= 0) {
+          const xp = get().profile.progression.xp;
+          const level = get().profile.progression.level;
+          return { newXP: xp, newLevel: level, leveledUp: false };
+        }
+
+        let leveledUp = false;
+        set((s) => {
+          const total = s.profile.progression.xp + safe;
+          const level = levelFromXP(total);
+          if (level > s.profile.progression.level) leveledUp = true;
+          return {
+            profile: {
+              ...s.profile,
+              progression: { xp: total, level },
+            },
+          };
+        });
+        const xp = get().profile.progression.xp;
+        const level = get().profile.progression.level;
+        return { newXP: xp, newLevel: level, leveledUp };
+      },
+
+      addCoins(amount) {
+        const safe = Math.max(0, Math.floor(amount || 0));
+        if (safe <= 0) return get().profile.coins;
+        set((s) => ({ profile: { ...s.profile, coins: s.profile.coins + safe } }));
+        return get().profile.coins;
+      },
+
+      spendCoins(amount) {
+        const safe = Math.max(0, Math.floor(amount || 0));
+        const coins = get().profile.coins;
+        if (safe <= 0) return true;
+        if (coins < safe) return false;
+        set((s) => ({ profile: { ...s.profile, coins: s.profile.coins - safe } }));
+        return true;
+      },
+
+      grantBadge(id) {
+        set((s) => ({ profile: { ...s.profile, badges: { ...s.profile.badges, [id]: true } } }));
+      },
+      hasBadge(id) {
+        return !!get().profile.badges[id];
+      },
+
+      grantCosmetic(id) {
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            inventory: { cosmetics: { ...s.profile.inventory.cosmetics, [id]: true } },
+          },
+        }));
+      },
+      hasCosmetic(id) {
+        return !!get().profile.inventory.cosmetics[id];
+      },
+
+      completeOnboarding({ nickname, avatarId }) {
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            nickname,
+            equipped: { ...s.profile.equipped, avatarId },
+            onboardingDone: true,
+            coins: s.profile.coins + ECONOMY_CONSTANTS.startCoins,
+          },
+        }));
+      },
+
+      resetProfile() {
+        set(() => ({ profile: createDefaultProfile() }));
+      },
+    }),
+    {
+      name: STORAGE_KEY,
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      migrate: (persisted: any) => persisted, // V1 -> V1
+      partialize: (state) => ({
+        version: state.version,
+        profile: state.profile,
+      }),
+    },
+  ),
+);
+
+/** đź”Ž DoporuÄŤenĂ© selektory pro ÄŤtenĂ­ (bez getterĹŻ) */
+export const selectProfile = (s: PlayerState) => s.profile;
+export const selectXP = (s: PlayerState) => s.profile.progression.xp;
+export const selectLevel = (s: PlayerState) => s.profile.progression.level;
+export const selectCoins = (s: PlayerState) => s.profile.coins;
+
+===== src\shared\store\uiStore.ts =====
+
+import { create } from 'zustand';
+
+export type ThemeMode = 'light' | 'dark';
+
+type UIState = {
+  themeMode: ThemeMode;
+  setThemeMode: (m: ThemeMode) => void;
+  toggleTheme: () => void;
+};
+
+const KEY = 'ui_theme_mode';
+
+const initialMode = (() => {
+  try {
+    const saved = localStorage.getItem(KEY) as ThemeMode | null;
+    if (saved === 'light' || saved === 'dark') return saved;
+    // preferuje systĂ©movĂ© nastavenĂ­
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+})();
+
+export const useUIStore = create<UIState>()((set, get) => ({
+  themeMode: initialMode,
+  setThemeMode: (m) => {
+    try { localStorage.setItem(KEY, m); } catch {}
+    set({ themeMode: m });
+  },
+  toggleTheme: () => {
+    const next = get().themeMode === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem(KEY, next); } catch {}
+    set({ themeMode: next });
+  },
+}));
+
+===== src\shared\types\economy.ts =====
+
+// Ekonomika a levelovĂˇnĂ­: kĹ™ivka XP pro levely 0â€“30 + pomocnĂ© vĂ˝poÄŤty
+
+/** MaximĂˇlnĂ­ dosaĹľitelnĂ˝ level. */
+export const LEVEL_CAP = 30 as const;
+
+/**
+ * KumulativnĂ­ XP potĹ™ebnĂ© pro dosaĹľenĂ­ danĂ©ho levelu.
+ * Index = level (0..30), hodnota = celkovĂ© XP k dosaĹľenĂ­ levelu.
+ * PĹ™Ă­klad: k dosaĹľenĂ­ levelu 5 je potĹ™eba >= 520 XP.
+ */
+export const LEVEL_XP: number[] = [
+  // lvl : cumulative XP
+  /*  0 */ 0,
+  /*  1 */ 0,
+  /*  2 */ 100,
+  /*  3 */ 220,
+  /*  4 */ 360,
+  /*  5 */ 520,
+  /*  6 */ 700,
+  /*  7 */ 900,
+  /*  8 */ 1120,
+  /*  9 */ 1360,
+  /* 10 */ 1620,
+  /* 11 */ 1900,
+  /* 12 */ 2200,
+  /* 13 */ 2520,
+  /* 14 */ 2860,
+  /* 15 */ 3220,
+  /* 16 */ 3600,
+  /* 17 */ 4000,
+  /* 18 */ 4420,
+  /* 19 */ 4860,
+  /* 20 */ 5320,
+  /* 21 */ 5800,
+  /* 22 */ 6300,
+  /* 23 */ 6820,
+  /* 24 */ 7360,
+  /* 25 */ 7920,
+  /* 26 */ 8500,
+  /* 27 */ 9100,
+  /* 28 */ 9720,
+  /* 29 */ 10360,
+  /* 30 */ 11020,
+];
+
+/** BezpeÄŤnĂ© oĹ™ezĂˇnĂ­ ÄŤĂ­sla. */
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Math.floor(n)));
+
+/** ZjiĹˇtÄ›nĂ­ levelu z celkovĂ˝ch XP (0..LEVEL_CAP). */
+export function levelFromXP(totalXP: number): number {
+  const xp = Math.max(0, Math.floor(totalXP || 0));
+  // najdeme nejvyĹˇĹˇĂ­ level, jehoĹľ prĂˇh nepĹ™evyĹˇuje xp
+  let lvl = 0;
+  for (let i = 0; i <= LEVEL_CAP; i++) {
+    if (LEVEL_XP[i] <= xp) lvl = i;
+    else break;
+  }
+  return clamp(lvl, 0, LEVEL_CAP);
+}
+
+/** KumulativnĂ­ XP prĂˇh pro dalĹˇĂ­ level (nebo null, pokud jsme v capu). */
+export function nextLevelThreshold(level: number): number | null {
+  const l = clamp(level, 0, LEVEL_CAP);
+  if (l >= LEVEL_CAP) return null;
+  return LEVEL_XP[l + 1];
+}
+
+/** Procento postupu v rĂˇmci aktuĂˇlnĂ­ho levelu (0â€“100). */
+export function levelProgressPct(totalXP: number): number {
+  const lvl = levelFromXP(totalXP);
+  const curBase = LEVEL_XP[lvl];
+  const next = nextLevelThreshold(lvl);
+  if (next == null) return 100;
+  const span = Math.max(1, next - curBase);
+  return Math.round(((totalXP - curBase) / span) * 100);
+}
+
+/** StartovnĂ­ odmÄ›ny/konstanty pro hrĂˇÄŤe (meta). */
+export const ECONOMY_CONSTANTS = {
+  startCoins: 50, // pro onboarding grant (metamÄ›na, ne kasino)
+  minXPGrant: 5,  // ochrana proti 0
+};
+
+===== src\shared\types\profile.ts =====
+
+// ZĂˇkladnĂ­ typy pro metaprogressi hrĂˇÄŤe (profil, XP/level, avatary, odznaky, kosmetika)
+
+export type PlayerId = string & {};
+export type BadgeId = string & {};
+export type CosmeticId = string & {};
+export type AvatarId = string & {};
+
+export interface Progression {
+  /** CelkovĂ© nasbĂ­ranĂ© XP (kumulativnÄ›). */
+  xp: number;
+  /** VypoÄŤtenĂˇ ĂşroveĹ (0â€“30). */
+  level: number;
+}
+
+export interface Inventory {
+  /** OdemÄŤenĂ© kosmetickĂ© poloĹľky (napĹ™. avatar frame, barvy, efektyâ€¦). */
+  cosmetics: Record<CosmeticId, true>;
+}
+
+export interface Equipped {
+  /** ZvolenĂ˝ avatar (povinnĂ˝ po onboardingu). */
+  avatarId: AvatarId | null;
+  /** VolitelnĂ˝ rĂˇm/skin avataru. */
+  frameId?: CosmeticId | null;
+}
+
+export interface PlayerProfile {
+  id: PlayerId;
+  nickname: string;
+  createdAt: number; // ts
+  /** ZĂˇkladnĂ­ mÄ›na pro shop/metu (oddÄ›lenĂ© od "casino.balance"). */
+  coins: number;
+  progression: Progression;
+  badges: Record<BadgeId, true>;
+  inventory: Inventory;
+  equipped: Equipped;
+
+  /** Onboarding flag â€“ dokud nenĂ­ hotovĂ˝, ukĂˇĹľeme OnboardingDialog. */
+  onboardingDone: boolean;
+}
+
+/** Default novĂ©ho profilu (bez perzistence). */
+export const createDefaultProfile = (): PlayerProfile => ({
+  id: `player-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
+  nickname: '',
+  createdAt: Date.now(),
+  coins: 0,
+  progression: { xp: 0, level: 0 },
+  badges: {},
+  inventory: { cosmetics: {} },
+  equipped: { avatarId: null, frameId: null },
+  onboardingDone: false,
+});
+
+===== src\widgets\AvatarBadge.tsx =====
+
+import { Avatar, Tooltip } from '@mui/material';
+import { usePlayerStore } from '@shared/store/playerStore';
+
+export default function AvatarBadge() {
+  const avatar = usePlayerStore((s) => s.profile.equipped.avatarId) ?? 'đź¶';
+  const nick = usePlayerStore((s) => s.profile.nickname) ?? 'Guest';
+  return (
+    <Tooltip title={nick}>
+      <Avatar
+        sx={{ width: 28, height: 28, fontSize: 16, bgcolor: 'background.paper', color: 'text.primary', border: '1px solid', borderColor: 'divider' }}
+      >
+        {avatar}
+      </Avatar>
+    </Tooltip>
+  );
+}
+
+===== src\widgets\BankIndicator.tsx =====
+
+import { Chip, Tooltip } from '@mui/material';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import { useCasino } from '@games/core/useCasino';
+
+export function BankIndicator() {
+  const { balance } = useCasino();
+  return (
+    <Tooltip title="Kasino mince (sĂˇzky/vĂ˝hry miniher)">
+      <span id="bank-anchor">
+        <Chip
+          icon={<MonetizationOnIcon />}
+          color="success"
+          variant="outlined"
+          label={balance}
+          size="small"
+          sx={{ fontWeight: 700 }}
+        />
+      </span>
+    </Tooltip>
+  );
+}
+
+export default BankIndicator;
+
+===== src\widgets\CasinoHUD.tsx =====
+
+import { Card, CardContent, Stack, Chip, Button, LinearProgress, Typography, Divider, Box } from '@mui/material';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import RedeemIcon from '@mui/icons-material/Redeem';
+import InsightsIcon from '@mui/icons-material/Insights';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import { useCasino } from '@games/core/useCasino';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, useAnimate, animate } from 'framer-motion';
+import { CoinBurst } from '@shared/fx/CoinBurst';
+import { Confetti } from '@shared/fx/Confetti';
+import { usePrev } from '@shared/fx/usePrev';
+
+export function CasinoHUD() {
+  const { balance, stats, maybeDailyBonus, resetAll } = useCasino();
+  const g = stats.global;
+  const wr = Math.max(0, Math.min(100, g.winRate || 0));
+
+  const prevBalance = usePrev(balance);
+  const delta = useMemo(() => (prevBalance != null ? balance - (prevBalance as number) : 0), [balance, prevBalance]);
+
+  const [scope, animateScope] = useAnimate();
+  const [coinFx, setCoinFx] = useState(false);
+  const [confettiFx, setConfettiFx] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const el = document.getElementById('balance-number');
+    if (!el || prevBalance == null) return;
+    const controls = animate(prevBalance as number, balance, {
+      duration: 0.6,
+      ease: 'easeOut',
+      onUpdate: (v) => { el.textContent = String(Math.round(v)); },
+    });
+    return () => { controls.stop(); };
+  }, [balance, prevBalance]);
+
+  useEffect(() => {
+    if (delta === 0) return;
+    animateScope(scope.current, { scale: [1, 1.08, 1] }, { duration: 0.35 });
+    if (delta > 0) {
+      setCoinFx(true); setConfettiFx(true);
+      const t = setTimeout(() => { setCoinFx(false); setConfettiFx(false); }, 1200);
+      return () => clearTimeout(t);
+    }
+  }, [delta, animateScope, scope]);
+
+  const handleBonus = () => {
+    const before = balance;
+    const r = maybeDailyBonus(20);
+    const gain = (r.balance ?? 0) - before;
+    setInfo(r.granted ? `đźŽ Bonus +${gain} pĹ™ipsĂˇn.` : 'Bonus uĹľ dnes vyÄŤerpĂˇn.');
+  };
+
+  return (
+    <>
+      <CoinBurst show={coinFx} />
+      <Confetti show={confettiFx} />
+      <Card variant="outlined" ref={scope}>
+        <CardContent>
+          <Stack direction="row" gap={1.25} alignItems="center" flexWrap="wrap">
+            <Chip
+              icon={<MonetizationOnIcon />}
+              label={
+                <Box component={motion.span} layout="position" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                  <span id="balance-number">{balance}</span>
+                  {delta !== 0 && (
+                    <Chip
+                      size="small"
+                      color={delta > 0 ? 'success' : 'error'}
+                      variant="filled"
+                      icon={delta > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
+                      label={(delta > 0 ? '+' : '') + delta}
+                      sx={{ ml: 0.5 }}
+                    />
+                  )}
+                </Box>
+              }
+            />
+            <Chip icon={<InsightsIcon />} variant="outlined" label={`Win rate: ${wr}%`} />
+            <Chip variant="outlined" label={`Hry: ${g.games} â€˘ VĂ˝hry: ${g.wins} â€˘ Prohry: ${g.losses} â€˘ RemĂ­zy: ${g.draws}`} />
+            <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+              <Button size="small" variant="outlined" startIcon={<RedeemIcon />} onClick={handleBonus}>
+                DennĂ­ bonus
+              </Button>
+              <Button size="small" color="error" variant="outlined" startIcon={<RestartAltIcon />} onClick={resetAll}>
+                Reset
+              </Button>
+            </Box>
+          </Stack>
+
+          <Divider sx={{ my: 1.25 }} />
+
+          <Typography variant="caption">Win rate</Typography>
+          <LinearProgress variant="determinate" value={wr} sx={{ mt: 0.5, height: 8, borderRadius: 999 }} />
+
+          {info && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {info}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+===== src\widgets\CoinCounter.tsx =====
+
+import { Chip, Tooltip } from '@mui/material';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import { usePlayerStore } from '@shared/store/playerStore';
+
+export default function CoinCounter() {
+  const coins = usePlayerStore((s) => s.profile.coins);
+  return (
+    <Tooltip title="Meta mince (shop, odznaky, kosmetika)">
+      <Chip
+        icon={<MonetizationOnIcon />}
+        color="warning"
+        variant="outlined"
+        label={coins}
+        size="small"
+        sx={{ fontWeight: 700 }}
+      />
+    </Tooltip>
+  );
+}
+
+===== src\widgets\LevelChip.tsx =====
+
+import { Chip, Tooltip } from '@mui/material';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import { usePlayerStore } from '@shared/store/playerStore';
+
+export default function LevelChip() {
+  const level = usePlayerStore((s) => s.profile.progression.level);
+  return (
+    <Tooltip title="TvĹŻj level (odemikĂˇ novĂ© hry)">
+      <Chip
+        icon={<EmojiEventsIcon />}
+        color="primary"
+        variant="outlined"
+        size="small"
+        label={`Lv ${level}`}
+        sx={{ fontWeight: 700 }}
+      />
+    </Tooltip>
+  );
+}
+
+===== src\widgets\OnboardingDialog.tsx =====
+
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Button, Stack, Typography, Avatar,
+} from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { useState } from 'react';
+import { playerApi } from '@games/core/player.api';
+import { usePlayerStore } from '@shared/store/playerStore';
+import { DEFAULT_AVATARS } from '@shared/constants/avatars';
+
+export function OnboardingDialog() {
+  const onboardingDone = usePlayerStore((s) => s.profile.onboardingDone);
+  const [nickname, setNickname] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
+
+  if (onboardingDone) return null;
+
+  const handleComplete = () => {
+    if (!nickname.trim() || !selected) return;
+    playerApi.completeOnboarding({ nickname: nickname.trim(), avatarId: selected });
+  };
+
+  return (
+    <Dialog open={!onboardingDone}>
+      <DialogTitle>VĂ­tej v My Arcade đźŽ®</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="body2">
+            Vyber si pĹ™ezdĂ­vku a svĂ©ho avatara. ZĂ­skĂˇĹˇ startovnĂ­ mince đź’° a odemkneĹˇ profil!
+          </Typography>
+
+          <TextField
+            label="PĹ™ezdĂ­vka"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            fullWidth
+            inputProps={{ maxLength: 16 }}
+          />
+
+          <Typography variant="subtitle2" sx={{ mt: 1 }}>TvĹŻj avatar</Typography>
+          <Grid container spacing={1}>
+            {DEFAULT_AVATARS.map((a) => (
+              <Grid key={a.id} size="auto">
+                <Avatar
+                  src={a.url}
+                  alt={a.name}
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    border: selected === a.id ? '2px solid #1976d2' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onClick={() => setSelected(a.id)}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Stack>
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={handleComplete} disabled={!nickname || !selected} variant="contained">
+          Potvrdit
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+===== src\widgets\XPBar.tsx =====
+
+import { LinearProgress, Stack, Typography } from '@mui/material';
+import { usePlayerStore, selectLevel, selectXP } from '@shared/store/playerStore';
+import { levelProgressPct } from '@shared/types/economy';
+
+/** Komponenta: horizontĂˇlnĂ­ progress bar pro XP/level */
+export function XPBar() {
+  const xp = usePlayerStore(selectXP);
+  const level = usePlayerStore(selectLevel);
+  const pct = levelProgressPct(xp);
+
+  return (
+    <Stack spacing={0.5} sx={{ width: '100%' }}>
+      <Typography variant="caption" sx={{ fontWeight: 600 }}>
+        Level {level} ({pct}%)
+      </Typography>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        sx={{ height: 8, borderRadius: 999, backgroundColor: 'action.hover' }}
+      />
+    </Stack>
+  );
+}

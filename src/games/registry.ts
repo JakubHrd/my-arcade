@@ -32,17 +32,15 @@ export const GAMES: GameMeta[] = [
     phase: 2,
     tag: 'karetní',
   },
-  // připravené placeholdery (nezobrazujeme tlačítko „Hrát“)
-  {
-    id: 'reaction',
-    key: 'reaction' as GameKey,
-    path: '/games/reaction',
-    title: 'Reaction Tap',
-    minLevel: 0,
-    phase: 1,
-    tag: 'reflex',
-    disabled: true,
-  },
+{
+  id: 'reaction',
+  key: 'reaction' as GameKey,
+  path: '/games/reaction',
+  title: 'Reaction Tap',
+  minLevel: 0,
+  phase: 1,
+  tag: 'reflex',
+},
   {
     id: 'pexeso',
     key: 'pexeso' as GameKey,
@@ -53,6 +51,25 @@ export const GAMES: GameMeta[] = [
     tag: 'logická',
     disabled: true,
   },
+    {
+    id: 'hilo',
+    key: 'hilo' as GameKey,
+    path: '/games/hilo',
+    title: 'Hi-Lo (karty)',
+    minLevel: 1,
+    phase: 1,
+    tag: 'karetní',
+  },
+  {
+  id: 'memory',
+  key: 'memory' as GameKey,
+  path: '/games/memory',
+  title: 'Memory Match (Pexeso)',
+  minLevel: 1,
+  phase: 1,
+  tag: 'Paměťová hra',
+}
+  
 ];
 
 export function getGameByPath(path: string) {

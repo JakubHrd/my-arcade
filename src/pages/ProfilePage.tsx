@@ -1,8 +1,8 @@
 import { Avatar, Stack, Typography, Divider, Box, Chip, Button } from '@mui/material';
 import { usePlayerStore } from '@shared/store/playerStore';
 import { XPBar } from '@widgets/XPBar';
-import { CoinCounter } from '@widgets/CoinCounter';
-import { LevelChip } from '@widgets/LevelChip';
+import CoinCounter from '@widgets/CoinCounter';
+import LevelChip from '@widgets/LevelChip';
 import { DEFAULT_AVATARS } from '@shared/constants/avatars';
 
 export function ProfilePage() {
